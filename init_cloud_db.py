@@ -40,24 +40,25 @@ def init_database():
         """)
         print("Table 'admin' verified.")
 
-        # 2. Student Table
+        # 2. Student Table (Aiven requires PRIMARY KEY)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS student (
-                Dep VARCHAR(50) DEFAULT NULL,
-                Course VARCHAR(50) DEFAULT NULL,
-                Year VARCHAR(20) DEFAULT NULL,
-                Semester VARCHAR(20) DEFAULT NULL,
-                Student_ID INT DEFAULT NULL,
-                Student_Name VARCHAR(50) DEFAULT NULL,
-                Division VARCHAR(20) DEFAULT NULL,
-                Roll VARCHAR(20) DEFAULT NULL,
-                Gender VARCHAR(20) DEFAULT NULL,
-                DOB VARCHAR(20) DEFAULT NULL,
-                Email VARCHAR(50) DEFAULT NULL,
-                Phone VARCHAR(20) DEFAULT NULL,
-                Address VARCHAR(100) DEFAULT NULL,
-                Teacher VARCHAR(50) DEFAULT NULL,
-                PhotoSample VARCHAR(10) DEFAULT NULL
+                Dep VARCHAR(100) DEFAULT NULL,
+                Course VARCHAR(100) DEFAULT NULL,
+                Year VARCHAR(50) DEFAULT NULL,
+                Semester VARCHAR(50) DEFAULT NULL,
+                Student_ID VARCHAR(50) NOT NULL,
+                Student_Name VARCHAR(100) DEFAULT NULL,
+                Division VARCHAR(50) DEFAULT NULL,
+                Roll VARCHAR(50) DEFAULT NULL,
+                Gender VARCHAR(50) DEFAULT NULL,
+                DOB VARCHAR(50) DEFAULT NULL,
+                Email VARCHAR(100) DEFAULT NULL,
+                Phone VARCHAR(50) DEFAULT NULL,
+                Address VARCHAR(255) DEFAULT NULL,
+                Teacher VARCHAR(100) DEFAULT NULL,
+                PhotoSample VARCHAR(50) DEFAULT NULL,
+                PRIMARY KEY (Student_ID)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """)
         print("Table 'student' verified.")

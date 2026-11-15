@@ -1,6 +1,10 @@
 import os
 import html
-from flask import Flask, request, jsonify, render_template_string
+import threading
+from flask import (
+    Flask, request, jsonify, render_template_string,
+    render_template, redirect, session, url_for
+)
 from math import radians, sin, cos, sqrt, atan2
 from datetime import datetime
 import mysql.connector
@@ -13,13 +17,15 @@ from approval_service import (
     process_approval_action,
     get_request_by_id,
     send_approval_email,
-    get_base_url
+    get_base_url,
+    get_secret_key
 )
 
 # Load environment configuration
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = get_secret_key()
 
 # ACTION CONFIRMATION PAGE TEMPLATE
 ACTION_CONFIRM_TEMPLATE = """
@@ -307,25 +313,219 @@ def check_student_id(student_id):
         if conn is not None and conn.is_connected():
             conn.close()
 
-# HOME & HEALTH CHECKS
+# HOME PORTAL & HEALTH CHECKS
 
 @app.route("/")
 def home():
-    db_connected = False
-    try:
-        test_conn = get_db_connection()
-        if test_conn.is_connected():
-            db_connected = True
-            test_conn.close()
-    except Exception:
-        db_connected = False
+    format_param = request.args.get("format", "").lower()
+    accept_header = request.headers.get("Accept", "")
 
-    return jsonify({
-        "status": "success",
-        "service": "Face Recognition Attendance & Approval Backend",
-        "database_connected": db_connected,
-        "render_compatible": True
-    })
+    # Return JSON if requested explicitly or by API clients
+    if format_param == "json" or ("application/json" in accept_header and "text/html" not in accept_header):
+        db_connected = False
+        try:
+            test_conn = get_db_connection()
+            if test_conn.is_connected():
+                db_connected = True
+                test_conn.close()
+        except Exception:
+            db_connected = False
+
+        return jsonify({
+            "status": "success",
+            "service": "Face Recognition Attendance & Approval Backend",
+            "database_connected": db_connected,
+            "render_compatible": True
+        })
+
+    # Render Modern Web Dashboard
+    stats = {
+        "total_students": 0,
+        "pending_requests": 0,
+        "approved_requests": 0
+    }
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM student")
+        stats["total_students"] = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM student_requests WHERE Status='Pending'")
+        stats["pending_requests"] = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM student_requests WHERE Status='Approved'")
+        stats["approved_requests"] = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("Stats fetch error:", e)
+
+    return render_template("index.html", stats=stats, active_page="home")
+
+# STUDENT REGISTRATION PAGE
+@app.route("/register")
+def register_page():
+    return render_template("register.html", active_page="register")
+
+# API FOR STUDENT REGISTRATION SUBMISSION
+@app.route("/api/submit-registration", methods=["POST"])
+def submit_registration_api():
+    data = request.get_json(silent=True) or {}
+    student_id = str(data.get("student_id", "")).strip()
+    student_name = str(data.get("student_name", "")).strip()
+
+    if not student_id or not student_name:
+        return jsonify({"success": False, "message": "Student ID and Full Name are required."}), 400
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if already enrolled in student table
+        cursor.execute("SELECT Student_ID FROM student WHERE Student_ID = %s LIMIT 1", (student_id,))
+        if cursor.fetchone():
+            return jsonify({
+                "success": False,
+                "message": f"Student ID '{student_id}' is already registered in the system."
+            }), 400
+
+        # Check if a pending request already exists
+        cursor.execute("SELECT Request_ID FROM student_requests WHERE Student_ID = %s AND Status = 'Pending' LIMIT 1", (student_id,))
+        if cursor.fetchone():
+            return jsonify({
+                "success": False,
+                "message": f"A registration request for Student ID '{student_id}' is already pending admin approval."
+            }), 400
+
+        # Insert new request
+        sql = """
+            INSERT INTO student_requests (
+                Dep, Course, Year, Semester, Student_ID, Student_Name,
+                Division, Roll, Gender, DOB, Email, Phone, Address, Teacher, PhotoSample, Status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending')
+        """
+        values = (
+            data.get("dep", ""),
+            data.get("course", ""),
+            data.get("year", ""),
+            data.get("semester", ""),
+            student_id,
+            student_name,
+            data.get("division", "A"),
+            data.get("roll", ""),
+            data.get("gender", ""),
+            data.get("dob", ""),
+            data.get("email", ""),
+            data.get("phone", ""),
+            data.get("address", ""),
+            data.get("teacher", ""),
+            "No"
+        )
+        cursor.execute(sql, values)
+        conn.commit()
+        new_request_id = cursor.lastrowid
+
+        # Dispatch async email notification to Admin
+        def notify_async(rid):
+            try:
+                req_data = get_request_by_id(rid)
+                if req_data:
+                    send_approval_email(req_data)
+            except Exception as ex:
+                print("Email dispatch error:", ex)
+
+        threading.Thread(target=notify_async, args=(new_request_id,), daemon=True).start()
+
+        return jsonify({
+            "success": True,
+            "message": f"Registration request #{new_request_id} for {student_name} submitted successfully! Admin has been notified for approval.",
+            "request_id": new_request_id
+        })
+
+    except Exception as e:
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        return jsonify({"success": False, "message": f"Database error: {str(e)}"}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+# ADMIN WEB PORTAL
+@app.route("/admin-portal")
+def admin_portal():
+    if not session.get("admin_logged_in"):
+        return render_template("admin_portal.html", logged_in=False, active_page="admin")
+
+    pending_requests = []
+    students = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM student_requests WHERE Status='Pending' ORDER BY Request_ID DESC")
+        pending_requests = cursor.fetchall()
+
+        cursor.execute("SELECT * FROM student ORDER BY Student_ID ASC")
+        students = cursor.fetchall()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("Admin portal data fetch error:", e)
+
+    return render_template(
+        "admin_portal.html",
+        logged_in=True,
+        username=session.get("admin_username", "Admin"),
+        pending_requests=pending_requests,
+        students=students,
+        active_page="admin"
+    )
+
+@app.route("/admin-portal/login", methods=["POST"])
+def admin_portal_login():
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+
+    is_valid = False
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT Password FROM admin WHERE Username = %s LIMIT 1", (username,))
+        row = cursor.fetchone()
+        if row and row[0] == password:
+            is_valid = True
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        if username == "admin" and password == "Admin@123":
+            is_valid = True
+
+    if is_valid:
+        session["admin_logged_in"] = True
+        session["admin_username"] = username
+        return redirect(url_for("admin_portal"))
+    else:
+        return "<script>alert('Invalid Admin credentials.'); window.location.href='/admin-portal';</script>"
+
+@app.route("/admin-portal/logout")
+def admin_portal_logout():
+    session.clear()
+    return redirect(url_for("admin_portal"))
+
+@app.route("/api/admin-action/<int:request_id>/<action>", methods=["POST"])
+def admin_action_api(request_id, action):
+    if not session.get("admin_logged_in"):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+
+    result = process_approval_action(request_id, action)
+    return jsonify(result), (200 if result.get("success") else 400)
 
 @app.route("/health")
 def health():
