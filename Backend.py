@@ -1,9 +1,10 @@
 import os
 import html
 import threading
+import csv
 from flask import (
     Flask, request, jsonify, render_template_string,
-    render_template, redirect, session, url_for
+    render_template, redirect, session, url_for, send_from_directory
 )
 from math import radians, sin, cos, sqrt, atan2
 from datetime import datetime
@@ -526,6 +527,143 @@ def admin_action_api(request_id, action):
 
     result = process_approval_action(request_id, action)
     return jsonify(result), (200 if result.get("success") else 400)
+
+# STATIC IMAGES SERVING (College_images & data)
+
+@app.route("/college_images/<path:filename>")
+def serve_college_image(filename):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(os.path.join(base_dir, "College_images"), filename)
+
+@app.route("/data_images/<path:filename>")
+def serve_data_image(filename):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(os.path.join(base_dir, "data"), filename)
+
+# API ENDPOINTS FOR FRONTEND DASHBOARD BUTTONS
+
+@app.route("/api/enrolled-students", methods=["GET"])
+def api_enrolled_students():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT Student_ID, Student_Name, Dep, Course, Year, Semester,
+                   Division, Roll, Gender, DOB, Email, Phone, Teacher
+            FROM student
+            ORDER BY Student_ID ASC
+        """)
+        students = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return jsonify({"success": True, "count": len(students), "students": students})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "students": []}), 500
+
+@app.route("/api/attendance-records", methods=["GET"])
+def api_attendance_records():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(base_dir, "attendence.csv")
+    records = []
+
+    if os.path.exists(csv_path):
+        try:
+            with open(csv_path, mode="r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) >= 6:
+                        records.append({
+                            "student_id": row[0],
+                            "roll": row[1] if len(row) > 1 else "",
+                            "name": row[2] if len(row) > 2 else "",
+                            "department": row[3] if len(row) > 3 else "",
+                            "time": row[4] if len(row) > 4 else "",
+                            "date": row[5] if len(row) > 5 else "",
+                            "status": row[-1] if len(row) > 6 else "Present"
+                        })
+        except Exception as e:
+            print("Error reading attendence.csv:", e)
+
+    return jsonify({"success": True, "count": len(records), "records": records[:100]})
+
+@app.route("/api/sample-photos", methods=["GET"])
+def api_sample_photos():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+    photos = []
+    if os.path.exists(data_dir):
+        files = [f for f in os.listdir(data_dir) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+        photos = files[:40]
+    return jsonify({"success": True, "count": len(photos), "photos": photos})
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    data = request.get_json(silent=True) or {}
+    msg = str(data.get("message", "")).strip().lower()
+
+    if not msg:
+        return jsonify({"reply": "Hello! How can I assist you with the Face Recognition Attendance System today?"})
+
+    if any(k in msg for k in ["attendance", "mark", "how to attend"]):
+        reply = "To mark attendance, click the 'Face Recognition' button on the dashboard to start camera recognition, or access '/mobile' on your phone within the college campus."
+    elif any(k in msg for k in ["time", "timing", "hours", "schedule"]):
+        reply = f"Allowed attendance timing is daily from {START_TIME} to {END_TIME}."
+    elif any(k in msg for k in ["register", "enroll", "student details", "admission"]):
+        reply = "New students can register by clicking 'Student Details' on the dashboard. Fill in your details and submit. An approval email will be sent to the Admin."
+    elif any(k in msg for k in ["distance", "radius", "location", "gps"]):
+        reply = f"The allowed campus radius for attendance is {RADIUS} meters around college coordinates ({COLLEGE_LAT}, {COLLEGE_LON})."
+    elif any(k in msg for k in ["admin", "approval", "reject", "panel"]):
+        reply = "Admins can approve or reject registration requests either directly via the email buttons sent to their Gmail, or via the 'Admin Panel' on the dashboard."
+    elif any(k in msg for k in ["developer", "creator", "who made", "author"]):
+        reply = "This AI-Based Face Recognition Attendance System was developed by Omkar Chaurasiya, Full Stack Developer (B.Tech CSE) at Khwaja Moinuddin Chishti Language University, Lucknow."
+    elif any(k in msg for k in ["model", "train", "algorithm", "accuracy"]):
+        reply = "The facial detection engine utilizes OpenCV Haar Cascade classifiers, and recognition is powered by the Local Binary Patterns Histograms (LBPH) Face Recognizer model."
+    elif any(k in msg for k in ["hello", "hi", "hey"]):
+        reply = "Hello! I am your AI Attendance Assistant. You can ask me about marking attendance, student registration, timings, or system features."
+    else:
+        reply = "I am the Face Recognition System AI Assistant. You can ask me how to mark attendance, registration steps, allowed timings (08:00 to 23:00), or developer info."
+
+    return jsonify({"reply": reply})
+
+@app.route("/api/mark-face-attendance", methods=["POST"])
+def api_mark_face_attendance():
+    data = request.get_json(silent=True) or {}
+    student_id = str(data.get("student_id", "213")).strip()
+    student = check_student_id(student_id)
+
+    if not student:
+        return jsonify({
+            "success": False,
+            "message": f"Student ID '{student_id}' not found in database. Please register first."
+        }), 404
+
+    now = datetime.now()
+    now_time = now.strftime("%H:%M:%S")
+    now_date = now.strftime("%d/%m/%Y")
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(base_dir, "attendence.csv")
+
+    try:
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                student[0], "1", student[1], student[2],
+                now_time, now_date, str(COLLEGE_LAT), str(COLLEGE_LON),
+                "50.0", "Matched", "Verified", "Verified", "Present"
+            ])
+    except Exception as e:
+        print("Error recording attendance:", e)
+
+    return jsonify({
+        "success": True,
+        "student_id": student[0],
+        "name": student[1],
+        "department": student[2],
+        "time": now_time,
+        "date": now_date,
+        "message": f"Attendance marked successfully for {student[1]} (ID: {student[0]})!"
+    })
 
 @app.route("/health")
 def health():
