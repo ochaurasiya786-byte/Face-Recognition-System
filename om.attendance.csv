@@ -1,5 +1,24 @@
-213,1,Om Chaurasiya,Computer Science,6:46:16,3/9/2026,Present
-214,2,Arun,AI&ML,6:50:17,3/9/2026,Present
-21,3,Disha,Civil,6:48:56,3/9/2026,Present
-25,4,Suman,it,6:48:56,3/9/2026,Present
-,,,,,,
+Student_ID,Roll,Name,Department,Time,Date,Latitude,Longitude,Distance,Face_Status,Location_Status,Time_Status,Attendance_Status
+213,1,Om Chaurasiya,Computer Science,14:26:01,09/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,04:45:34,10/09/2026,26.932376660708588,80.9214877612512,2546.98,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,03:30:13,12/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,15:57:15,13/09/2026,26.9315665,80.9265525,3032.7,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,11:08:54,14/09/2026,26.929099702686045,80.89595016641124,50.72,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,13:03:54,17/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,10:50:33,18/09/2026,26.928109674260458,80.89636993641619,66.97,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,07:38:07,20/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,20:23:15,21/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,14:53:16,24/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,22:25:16,27/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,02:26:51,29/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,22:42:40,30/09/2026,26.933744,80.91687,2131.59,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,20:16:28,01/10/2026,26.931468750000004,80.92513575,2891.89,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,15:15:23,07/10/2026,26.931462191958495,80.92511350713359,2889.62,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,19:30:51,09/10/2026,26.932409665665237,80.92170527274679,2568.85,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,20:27:44,10/10/2026,26.931465157276577,80.92511879256205,2890.18,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,17:49:02,12/10/2026,26.931465157276577,80.92511879256205,2890.18,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,18:34:15,13/10/2026,26.93148542446352,80.92503598679139,2882.26,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,19:12:18,14/10/2026,26.931463460557342,80.92511623723469,2889.9,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,07:56:41,19/10/2026,26.931467741754812,80.92511546839431,2889.88,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,15:02:41,20/10/2026,26.931465157276577,80.92511879256205,2890.18,Matched,Verified,Verified,Present
+213,1,Om Chaurasiya,Computer Science,15:35:27,22/10/2026,26.93019585,80.89538050000002,184.98,Matched,Verified,Verified,Present

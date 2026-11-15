@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Attendance Location Verification</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+</head>
+
+
+<body>
+
+    <h2>College Attendance</h2>
+
+
+    <input type="text" id="student_id" placeholder="Enter Student ID">
+
+
+    <br><br>
+
+
+    <button onclick="startLocation()">
+        Start Laptop Location
+    </button>
+
+
+    <button onclick="stopLocation()">
+        Stop Location
+    </button>
+
+
+    <p id="result">
+        Enter Student ID and start laptop location.
+    </p>
+
+
+    <script>
+
+
+        let watchId = null;
+
+
+
+        // START LAPTOP LOCATION
+
+
+        function startLocation() {
+
+
+            let studentId =
+                document.getElementById("student_id").value.trim();
+
+
+            if (studentId === "") {
+
+                document.getElementById("result").innerText =
+                    "Please enter Student ID";
+
+                return;
+
+            }
+
+
+            if (!navigator.geolocation) {
+
+                document.getElementById("result").innerText =
+                    "GPS/Location is not supported by this browser";
+
+                return;
+
+            }
+
+
+            document.getElementById("result").innerText =
+                "Getting laptop location...";
+
+
+
+            // WATCH LAPTOP LOCATION CONTINUOUSLY
+
+
+            watchId = navigator.geolocation.watchPosition(
+
+
+                function (position) {
+
+
+                    let latitude =
+                        position.coords.latitude;
+
+
+                    let longitude =
+                        position.coords.longitude;
+
+
+                    let accuracy =
+                        position.coords.accuracy;
+
+
+
+                    // SHOW ACTUAL BROWSER LOCATION
+
+
+                    document.getElementById("result").innerText =
+
+                        "Laptop location received.\n\n" +
+
+                        "Latitude: " +
+                        latitude +
+
+                        "\nLongitude: " +
+                        longitude +
+
+                        "\nAccuracy: " +
+                        Math.round(accuracy) +
+                        " meters" +
+
+                        "\n\nChecking college area...";
+
+
+
+                    // SEND LOCATION TO FLASK BACKEND
+
+
+                    fetch(
+                        "/verify-pc-location",
+                        {
+
+                            method: "POST",
+
+                            headers: {
+
+                                "Content-Type":
+                                    "application/json"
+
+                            },
+
+                            body: JSON.stringify({
+
+                                student_id:
+                                    studentId,
+
+                                latitude:
+                                    latitude,
+
+                                longitude:
+                                    longitude
+
+                            })
+
+                        }
+                    )
+
+
+                        .then(
+                            response => {
+
+
+                                if (!response.ok) {
+
+                                    throw new Error(
+                                        "Server response error"
+                                    );
+
+                                }
+
+
+                                return response.json();
+
+                            }
+                        )
+
+
+                        .then(
+                            data => {
+
+
+
+                                // LOCATION VERIFIED
+
+
+                                if (
+                                    data.success === true
+                                ) {
+
+
+                                    document.getElementById(
+                                        "result"
+                                    ).innerText =
+
+
+                                        "✓ LAPTOP LOCATION VERIFIED\n\n" +
+
+
+                                        "Student ID: " +
+                                        data.student_id +
+
+
+                                        "\nStudent Name: " +
+                                        data.student_name +
+
+
+                                        "\n\nLatitude: " +
+                                        latitude +
+
+
+                                        "\nLongitude: " +
+                                        longitude +
+
+
+                                        "\nAccuracy: " +
+                                        Math.round(accuracy) +
+                                        " meters" +
+
+
+                                        "\n\nDistance: " +
+                                        data.distance +
+                                        " meters" +
+
+
+                                        "\nAllowed Radius: " +
+                                        data.radius +
+                                        " meters" +
+
+
+                                        "\n\nFace Recognition can now continue.";
+
+                                }
+
+
+
+                                // LOCATION NOT VERIFIED
+
+
+                                else {
+
+
+                                    if (
+                                        data.distance !== undefined
+                                    ) {
+
+
+                                        document.getElementById(
+                                            "result"
+                                        ).innerText =
+
+
+                                            "✗ LOCATION NOT VERIFIED\n\n" +
+
+
+                                            data.message +
+
+
+                                            "\n\nLatitude: " +
+                                            latitude +
+
+
+                                            "\nLongitude: " +
+                                            longitude +
+
+
+                                            "\nAccuracy: " +
+                                            Math.round(accuracy) +
+                                            " meters" +
+
+
+                                            "\n\nDistance: " +
+                                            data.distance +
+                                            " meters" +
+
+
+                                            "\nAllowed Radius: " +
+                                            data.radius +
+                                            " meters";
+
+
+                                    }
+
+
+                                    else {
+
+
+                                        document.getElementById(
+                                            "result"
+                                        ).innerText =
+
+                                            data.message +
+
+                                            "\n\nLatitude: " +
+                                            latitude +
+
+                                            "\nLongitude: " +
+                                            longitude +
+
+                                            "\nAccuracy: " +
+                                            Math.round(accuracy) +
+                                            " meters";
+
+                                    }
+
+                                }
+
+                            }
+                        )
+
+
+                        .catch(
+                            error => {
+
+
+                                console.error(error);
+
+
+                                document.getElementById(
+                                    "result"
+                                ).innerText =
+
+
+                                    "Server error.\n" +
+
+                                    "Please check the backend server." +
+
+                                    "\n\nLatitude: " +
+                                    latitude +
+
+                                    "\nLongitude: " +
+                                    longitude +
+
+                                    "\nAccuracy: " +
+                                    Math.round(accuracy) +
+                                    " meters";
+
+                            }
+                        );
+
+
+                },
+
+
+
+                // LOCATION ERROR
+
+
+                function (error) {
+
+
+                    console.error(
+
+                        "Location Error Code:",
+                        error.code,
+
+                        "Message:",
+                        error.message
+
+                    );
+
+
+                    if (
+                        error.code === 1
+                    ) {
+
+
+                        document.getElementById(
+                            "result"
+                        ).innerText =
+
+                            "Location permission denied.\n\n" +
+
+                            "Please allow location permission " +
+                            "for this site.";
+
+                    }
+
+
+                    else if (
+                        error.code === 2
+                    ) {
+
+
+                        document.getElementById(
+                            "result"
+                        ).innerText =
+
+                            "Location unavailable.\n\n" +
+
+                            "Please turn ON Windows Location " +
+
+                            "and browser location permission.";
+
+                    }
+
+
+                    else if (
+                        error.code === 3
+                    ) {
+
+
+                        document.getElementById(
+                            "result"
+                        ).innerText =
+
+                            "Location request timed out.\n\n" +
+
+                            "Please wait and try again.";
+
+                    }
+
+
+                    else {
+
+
+                        document.getElementById(
+                            "result"
+                        ).innerText =
+
+                            "Unable to get laptop location.\n\n" +
+
+                            "Please try again.";
+
+                    }
+
+                },
+
+
+
+                // LOCATION SETTINGS
+
+
+                {
+
+                    enableHighAccuracy: true,
+
+                    timeout: 15000,
+
+                    maximumAge: 0
+
+                }
+
+            );
+
+        }
+
+
+
+        // STOP LOCATION
+
+
+        function stopLocation() {
+
+
+            if (
+                watchId !== null
+            ) {
+
+
+                navigator.geolocation.clearWatch(
+                    watchId
+                );
+
+
+                watchId = null;
+
+
+                document.getElementById(
+                    "result"
+                ).innerText =
+
+                    "Laptop location tracking stopped.";
+
+            }
+
+        }
+        // PAGE CLOSE
+
+        window.addEventListener(
+
+            "beforeunload",
+
+            function () {
+
+
+                if (
+                    watchId !== null
+                ) {
+
+
+                    navigator.geolocation.clearWatch(
+                        watchId
+                    );
+
+                }
+
+            }
+
+        );
+
+
+    </script>
+
+
+</body>
+
+</html>
