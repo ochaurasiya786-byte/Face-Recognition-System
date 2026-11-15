@@ -300,6 +300,85 @@ def process_approval_action(request_id, action, db_config=None):
             conn.close()
 
 
+def send_email_via_http_api(to_email, subject, html_content, plain_content=""):
+    """
+    Sends email over HTTPS (Port 443) which is 100% open on Render Free Tier.
+    Supports Resend API, Brevo API, and Google Apps Script Webhooks.
+    """
+    import urllib.request
+    import json
+
+    # 1. Google Apps Script Webhook (Direct from your own Gmail account over HTTPS)
+    gmail_webhook_url = os.getenv("GMAIL_WEBHOOK_URL", "").strip()
+    if gmail_webhook_url:
+        try:
+            req = urllib.request.Request(
+                gmail_webhook_url,
+                data=json.dumps({
+                    "to": to_email,
+                    "subject": subject,
+                    "htmlBody": html_content,
+                    "body": plain_content
+                }).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as res:
+                if res.status in (200, 201, 302):
+                    return True, "Email sent via Google Apps Script Webhook (Port 443)."
+        except Exception as e:
+            print("Webhook email error:", e)
+
+    # 2. Resend API (Free 100 emails/day, Port 443)
+    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+    if resend_api_key:
+        try:
+            from_email = os.getenv("RESEND_FROM", "onboarding@resend.dev")
+            req = urllib.request.Request(
+                "https://api.resend.com/emails",
+                data=json.dumps({
+                    "from": from_email,
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html_content
+                }).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {resend_api_key}",
+                    "Content-Type": "application/json"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=15) as res:
+                if res.status in (200, 201):
+                    return True, "Email sent via Resend API (Port 443)."
+        except Exception as e:
+            print("Resend API error:", e)
+
+    # 3. Brevo API (Free 300 emails/day, Port 443)
+    brevo_api_key = os.getenv("BREVO_API_KEY", "").strip()
+    if brevo_api_key:
+        try:
+            sender_email = os.getenv("SMTP_EMAIL", "ochaurasiya786@gmail.com")
+            req = urllib.request.Request(
+                "https://api.brevo.com/v3/smtp/email",
+                data=json.dumps({
+                    "sender": {"email": sender_email, "name": "Attendance Admin"},
+                    "to": [{"email": to_email}],
+                    "subject": subject,
+                    "htmlContent": html_content
+                }).encode("utf-8"),
+                headers={
+                    "api-key": brevo_api_key,
+                    "Content-Type": "application/json"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=15) as res:
+                if res.status in (200, 201):
+                    return True, "Email sent via Brevo API (Port 443)."
+        except Exception as e:
+            print("Brevo API error:", e)
+
+    return False, "No HTTPS email provider configured."
+
+
 def send_approval_email(
     request_data,
     base_url=None,
@@ -540,9 +619,15 @@ def send_approval_email(
     """
     msg.add_alternative(html_content, subtype="html")
 
+    # 1. Try HTTPS API if configured (Port 443 is unblocked on Render Free Tier)
+    http_ok, http_msg = send_email_via_http_api(admin_email, msg["Subject"], html_content, plain_content)
+    if http_ok:
+        return True, f"Approval notification email sent via HTTPS for request #{request_id}."
+
+    # 2. Try Standard SMTP (Works on local PC or paid hosting)
     try:
         clean_password = smtp_app_password.replace(" ", "")
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=12) as server:
             server.ehlo()
             server.starttls(context=ssl.create_default_context())
             server.login(smtp_email, clean_password)
@@ -550,7 +635,10 @@ def send_approval_email(
         return True, f"Approval notification email sent for request #{request_id}."
     except Exception as e:
         err_msg = f"Failed to send email: {str(e)}"
-        print(err_msg)
+        if "101" in str(e) or "unreachable" in str(e).lower():
+            print("Notice: Render Free Tier blocks outbound SMTP ports 587/465. To send emails from Render, use an HTTPS email API (RESEND_API_KEY / BREVO_API_KEY / GMAIL_WEBHOOK_URL) or manage requests via Admin Panel.")
+        else:
+            print(err_msg)
         return False, err_msg
 
 
@@ -632,9 +720,15 @@ AI Face Recognition Attendance Management System
     """
     msg.add_alternative(html_content, subtype="html")
 
+    # 1. Try HTTPS API if configured
+    http_ok, http_msg = send_email_via_http_api(student_email, msg["Subject"], html_content, plain_content)
+    if http_ok:
+        return True, f"Decision email sent via HTTPS to student {student_email}."
+
+    # 2. Try Standard SMTP
     try:
         clean_password = smtp_app_password.replace(" ", "")
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=12) as server:
             server.ehlo()
             server.starttls(context=ssl.create_default_context())
             server.login(smtp_email, clean_password)
@@ -642,7 +736,8 @@ AI Face Recognition Attendance Management System
         return True, f"Decision email sent to student {student_email}."
     except Exception as e:
         err_msg = f"Failed to send decision email: {str(e)}"
-        print(err_msg)
+        if "101" not in str(e) and "unreachable" not in str(e).lower():
+            print(err_msg)
         return False, err_msg
 
 
@@ -714,9 +809,15 @@ AI Face Recognition Attendance Management System
     """
     msg.add_alternative(html_content, subtype="html")
 
+    # 1. Try HTTPS API if configured
+    http_ok, http_msg = send_email_via_http_api(student_email, msg["Subject"], html_content, plain_content)
+    if http_ok:
+        return True, f"Submission confirmation email sent via HTTPS to student {student_email}."
+
+    # 2. Try Standard SMTP
     try:
         clean_password = smtp_app_password.replace(" ", "")
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=12) as server:
             server.ehlo()
             server.starttls(context=ssl.create_default_context())
             server.login(smtp_email, clean_password)
@@ -724,6 +825,7 @@ AI Face Recognition Attendance Management System
         return True, f"Submission confirmation email sent to student {student_email}."
     except Exception as e:
         err_msg = f"Failed to send confirmation email: {str(e)}"
-        print(err_msg)
+        if "101" not in str(e) and "unreachable" not in str(e).lower():
+            print(err_msg)
         return False, err_msg
 
