@@ -692,8 +692,9 @@
                 <button class="modal-close-btn" onclick="closeModal('modalStudent')">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #18385f;padding-bottom:10px;">
+                <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #18385f;padding-bottom:10px;flex-wrap:wrap;">
                     <button id="tabBtnRegister" onclick="showStudentTab('register')" class="btn-action" style="padding:8px 16px;">Enroll New Student</button>
+                    <button id="tabBtnCapture" onclick="showStudentTab('capture')" class="btn-action" style="background:#0d274c;padding:8px 16px;">&#128248; Add New Face</button>
                     <button id="tabBtnDirectory" onclick="showStudentTab('directory')" class="btn-action" style="background:#0d274c;padding:8px 16px;">View Enrolled Students</button>
                 </div>
 
@@ -811,6 +812,32 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                <!-- 3. New Face Capture View -->
+                <div id="studentCaptureView" style="display:none;text-align:center;">
+                    <p style="color:#9db4cf;font-size:0.9rem;margin-bottom:14px;">
+                        Capture new student face samples directly into the training dataset.
+                    </p>
+                    <div style="max-width:320px;margin:0 auto 14px;text-align:left;">
+                        <label style="font-size:0.85rem;color:#9db4cf;display:block;margin-bottom:4px;">Student ID *</label>
+                        <input type="text" id="capStudentId" placeholder="e.g. 213, 987" style="width:100%;">
+                    </div>
+                    <div class="scanner-container" style="max-width:380px;height:240px;margin-bottom:12px;">
+                        <video id="captureVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+                        <canvas id="captureCanvas" style="display:none;"></canvas>
+                    </div>
+                    <div id="captureStatus" style="font-size:0.9rem;color:#55c7ff;font-weight:700;margin-bottom:14px;">
+                        Camera ready...
+                    </div>
+                    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;">
+                        <button class="btn-action" onclick="startCaptureCamera()">&#128247; Start Camera</button>
+                        <button class="btn-action" style="background:#10b981;" onclick="takeSampleBatch()">&#128248; Capture 5 Samples</button>
+                        <button class="btn-action" style="background:#dc2626;" onclick="stopCaptureCamera()">Stop Camera</button>
+                    </div>
+                    <button class="btn-action" style="background:#0d274c;width:100%;" onclick="openModal('modalTrain')">
+                        &rarr; Go to Train Data to Retrain Model
+                    </button>
                 </div>
             </div>
         </div>
@@ -949,16 +976,23 @@
                     </div>
                     <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #18385f;padding-bottom:10px;">
                         <span style="color:#9db4cf;">Classifier File:</span>
-                        <strong style="color:#ffffff;">classifier.xml (12.4 MB)</strong>
+                        <strong style="color:#ffffff;">classifier.xml (Active)</strong>
                     </div>
                     <div style="display:flex;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid #18385f;padding-bottom:10px;">
+                        <span style="color:#9db4cf;">Matching Rule:</span>
+                        <strong style="color:#10b981;">Strict Verification (Distance &le; 48)</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;">
                         <span style="color:#9db4cf;">Status:</span>
-                        <span style="background:#065f46;color:#34d399;padding:3px 10px;border-radius:12px;font-weight:700;font-size:0.8rem;">TRAINED &bull; ACTIVE</span>
+                        <span id="trainBadge" style="background:#065f46;color:#34d399;padding:3px 10px;border-radius:12px;font-weight:700;font-size:0.8rem;">TRAINED &bull; ACTIVE</span>
                     </div>
                 </div>
 
                 <div style="text-align:center;">
-                    <button class="btn-action" style="background:#10b981;" onclick="alert('Model classifier.xml is verified and loaded in memory on the cloud server.')">&#10003; Model Status: Optimal</button>
+                    <button class="btn-action" id="btnTrainModel" style="background:#10b981;padding:12px 24px;font-size:0.95rem;width:100%;margin-bottom:12px;" onclick="triggerWebTraining()">
+                        &#9889; Run AI Model Training Now
+                    </button>
+                    <div id="trainOutput" style="display:none;font-size:0.85rem;line-height:1.5;text-align:left;"></div>
                 </div>
             </div>
         </div>
@@ -1150,17 +1184,150 @@
 
         // 3. Student Registration Tab Switcher
         function showStudentTab(tab) {
+            const regView = document.getElementById('studentRegisterView');
+            const dirView = document.getElementById('studentDirectoryView');
+            const capView = document.getElementById('studentCaptureView');
+            const btnReg = document.getElementById('tabBtnRegister');
+            const btnCap = document.getElementById('tabBtnCapture');
+            const btnDir = document.getElementById('tabBtnDirectory');
+
+            regView.style.display = 'none';
+            dirView.style.display = 'none';
+            if (capView) capView.style.display = 'none';
+            btnReg.style.background = '#0d274c';
+            if (btnCap) btnCap.style.background = '#0d274c';
+            btnDir.style.background = '#0d274c';
+
             if (tab === 'register') {
-                document.getElementById('studentRegisterView').style.display = 'block';
-                document.getElementById('studentDirectoryView').style.display = 'none';
-                document.getElementById('tabBtnRegister').style.background = '#2563eb';
-                document.getElementById('tabBtnDirectory').style.background = '#0d274c';
+                regView.style.display = 'block';
+                btnReg.style.background = '#2563eb';
+            } else if (tab === 'capture') {
+                if (capView) capView.style.display = 'block';
+                if (btnCap) btnCap.style.background = '#2563eb';
+                const sid = document.getElementById('m_student_id').value.trim();
+                if (sid) document.getElementById('capStudentId').value = sid;
             } else {
-                document.getElementById('studentRegisterView').style.display = 'none';
-                document.getElementById('studentDirectoryView').style.display = 'block';
-                document.getElementById('tabBtnRegister').style.background = '#0d274c';
-                document.getElementById('tabBtnDirectory').style.background = '#2563eb';
+                dirView.style.display = 'block';
+                btnDir.style.background = '#2563eb';
                 loadEnrolledStudents();
+            }
+        }
+
+        let capTrack = null;
+        async function startCaptureCamera() {
+            const video = document.getElementById('captureVideo');
+            const status = document.getElementById('captureStatus');
+            try {
+                status.textContent = 'Opening camera...';
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 450, height: 450 } });
+                video.srcObject = stream;
+                capTrack = stream.getTracks()[0];
+                status.textContent = 'Camera active! Click "Capture 5 Samples"';
+                status.style.color = '#10b981';
+            } catch (err) {
+                status.textContent = 'Camera error: ' + err.message;
+                status.style.color = '#ef4444';
+            }
+        }
+
+        function stopCaptureCamera() {
+            if (capTrack) {
+                capTrack.stop();
+                capTrack = null;
+            }
+            const status = document.getElementById('captureStatus');
+            if (status) {
+                status.textContent = 'Camera stopped.';
+                status.style.color = '#9db4cf';
+            }
+        }
+
+        async function takeSampleBatch() {
+            const sidInput = document.getElementById('capStudentId');
+            const sid = sidInput ? sidInput.value.trim() : '';
+            if (!sid) {
+                alert('Please enter a Student ID first.');
+                return;
+            }
+            const video = document.getElementById('captureVideo');
+            const canvas = document.getElementById('captureCanvas');
+            const status = document.getElementById('captureStatus');
+
+            if (!capTrack) {
+                await startCaptureCamera();
+                await new Promise(r => setTimeout(r, 600));
+            }
+
+            canvas.width = 450;
+            canvas.height = 450;
+            const ctx = canvas.getContext('2d');
+            const samples = [];
+
+            status.textContent = 'Capturing face samples...';
+            status.style.color = '#55c7ff';
+
+            for (let i = 0; i < 5; i++) {
+                ctx.drawImage(video, 0, 0, 450, 450);
+                samples.push(canvas.toDataURL('image/jpeg', 0.9));
+                await new Promise(r => setTimeout(r, 200));
+            }
+
+            try {
+                const res = await fetch('/api/upload-face-samples', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: sid, images: samples })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    status.textContent = `✔ ${data.message}`;
+                    status.style.color = '#34d399';
+                    alert(`${data.message}\n\nPlease click "Train Data" on the dashboard to retrain the recognition model with this new face.`);
+                } else {
+                    status.textContent = 'Failed: ' + data.message;
+                    status.style.color = '#ef4444';
+                }
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                status.style.color = '#ef4444';
+            }
+        }
+
+        async function triggerWebTraining() {
+            const btn = document.getElementById('btnTrainModel');
+            const out = document.getElementById('trainOutput');
+            const badge = document.getElementById('trainBadge');
+            btn.disabled = true;
+            btn.textContent = '⏳ Training in Progress (Processing Dataset)...';
+            out.style.display = 'block';
+            out.innerHTML = '<span style="color:#55c7ff;">Computing LBPH histograms across all face samples in data folder...</span>';
+
+            try {
+                const res = await fetch('/api/train-classifier', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    btn.textContent = '✔ Model Trained Successfully!';
+                    btn.style.background = '#059669';
+                    badge.textContent = 'TRAINED • UPDATED';
+                    let studentListHtml = '';
+                    if (data.students && data.students.length) {
+                        studentListHtml = '<ul style="margin:8px 0 0 18px;color:#34d399;">' + data.students.map(s => `<li>${s}</li>`).join('') + '</ul>';
+                    }
+                    out.innerHTML = `<div style="background:#064e3b;border:1px solid #059669;padding:12px;border-radius:6px;color:#d1fae5;"><strong>${data.message}</strong>${studentListHtml}</div>`;
+                } else {
+                    btn.textContent = '❌ Training Failed';
+                    btn.style.background = '#dc2626';
+                    out.innerHTML = `<div style="background:#7f1d1d;border:1px solid #dc2626;padding:12px;border-radius:6px;color:#fecaca;"><strong>Error:</strong> ${data.message}</div>`;
+                }
+            } catch (err) {
+                btn.textContent = '❌ Training Error';
+                out.innerHTML = `<span style="color:#ef4444;">Network error: ${err.message}</span>`;
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = '⚡ Run AI Model Training Now';
+                    btn.style.background = '#10b981';
+                }, 4000);
             }
         }
 

@@ -157,337 +157,163 @@ class Train:
                 parent=self.root
             )
 
+# STANDALONE ENGINE FUNCTION
+def train_dataset_engine(base_dir=None, show_window=False):
+    """
+    Trains the LBPH Face Recognizer classifier using all samples in the data directory.
+    Works independently of database availability (never skips valid faces).
+    Returns (success: bool, message: str, trained_students: list).
+    """
+    if base_dir is None:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    data_dir = os.path.join(base_dir, "data")
+    classifier_path = os.path.join(base_dir, "classifier.xml")
+    temp_path = os.path.join(base_dir, "classifier_temp.xml")
+
+    if not os.path.exists(data_dir):
+        return False, "Data folder not found!", []
+
+    image_files = [
+        os.path.join(data_dir, file)
+        for file in os.listdir(data_dir)
+        if file.lower().endswith((".jpg", ".jpeg", ".png"))
+    ]
+
+    if len(image_files) == 0:
+        return False, "No training images found in data folder!", []
+
+    # Optional: fetch student names from cloud DB for display
+    student_data = {}
+    try:
+        from approval_service import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT Student_ID, Student_Name FROM student")
+            for row in cursor.fetchall():
+                try:
+                    student_data[int(row[0])] = str(row[1]).strip()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            cursor.execute("SELECT Student_ID, Student_Name FROM student_requests")
+            for row in cursor.fetchall():
+                try:
+                    sid = int(row[0])
+                    if sid not in student_data:
+                        student_data[sid] = str(row[1]).strip()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print("Notice: Proceeding with training in offline ID mode (DB unreachable):", e)
+
+    faces = []
+    ids = []
+
+    training_window = "Training Face Data"
+    if show_window:
+        try:
+            cv2.namedWindow(training_window, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(training_window, 450, 450)
+        except Exception:
+            show_window = False
+
+    for image_path in image_files:
+        try:
+            filename = os.path.basename(image_path)
+            parts = filename.split(".")
+            if len(parts) < 3:
+                continue
+
+            try:
+                student_id = int(parts[1])
+            except ValueError:
+                continue
+
+            student_name = student_data.get(student_id, f"Student {student_id}")
+
+            img = Image.open(image_path).convert("L")
+            image_np = np.array(img, dtype=np.uint8)
+
+            faces.append(image_np)
+            ids.append(student_id)
+
+            if show_window:
+                display_img = cv2.cvtColor(image_np, cv2.COLOR_GRAY2BGR)
+                cv2.putText(display_img, f"ID: {student_id}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                cv2.putText(display_img, f"Name: {student_name}", (10, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+                cv2.imshow(training_window, display_img)
+                cv2.waitKey(1)
+
+        except Exception as e:
+            print("Error in image:", image_path, e)
+            continue
+
+    if show_window:
+        try:
+            cv2.destroyAllWindows()
+        except Exception:
+            pass
+
+    if len(faces) == 0:
+        return False, "Valid training images not found in data folder!", []
+
+    try:
+        ids_arr = np.array(ids, dtype=np.int32)
+        clf = cv2.face.LBPHFaceRecognizer_create()
+        clf.train(faces, ids_arr)
+        clf.write(temp_path)
+
+        if os.path.exists(classifier_path):
+            try:
+                os.remove(classifier_path)
+            except Exception:
+                pass
+
+        os.replace(temp_path, classifier_path)
+
+        unique_ids = sorted(set(ids))
+        trained_students = [
+            f"ID {sid} - {student_data.get(sid, 'Student ' + str(sid))}"
+            for sid in unique_ids
+        ]
+        return True, f"Successfully trained {len(faces)} face samples across {len(unique_ids)} student(s).", trained_students
+
+    except Exception as e:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+        return False, f"Classifier training failed: {str(e)}", []
+
+
     # TRAIN CLASSIFIER
 
     def train_classifier(self):
-
-        base_dir = os.path.dirname(
-            os.path.abspath(__file__)
-        )
-
-        data_dir = os.path.join(
-            base_dir,
-            "data"
-        )
-
-        classifier_path = os.path.join(
-            base_dir,
-            "classifier.xml"
-        )
-
-        temp_path = os.path.join(
-            base_dir,
-            "classifier_temp.xml"
-        )
-
-        # CHECK DATA FOLDER
-
-        if not os.path.exists(data_dir):
-
-            messagebox.showerror(
-                "Error",
-                "Data folder not found!",
-                parent=self.root
-            )
-
-            return
-
-        image_files = [
-            os.path.join(data_dir, file)
-            for file in os.listdir(data_dir)
-            if file.lower().endswith(
-                (".jpg", ".jpeg", ".png")
-            )
-        ]
-
-        if len(image_files) == 0:
-
-            messagebox.showerror(
-                "Error",
-                "No training images found in data folder!",
-                parent=self.root
-            )
-
-            return
-
-        # LOAD DATABASE
-
-        student_data = {}
-
-        try:
-            from approval_service import get_db_connection
-            conn = get_db_connection()
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT
-                    Student_ID,
-                    Student_Name
-                FROM student
-            """)
-
-            results = cursor.fetchall()
-
-            for row in results:
-
-                try:
-
-                    sid = int(row[0])
-
-                    student_data[sid] = str(
-                        row[1]
-                    ).strip()
-
-                except Exception:
-                    continue
-
-            cursor.close()
-            conn.close()
-
-        except mysql.connector.Error as err:
-
-            messagebox.showerror(
-                "Database Error",
-                str(err),
-                parent=self.root
-            )
-
-            return
-
-        # TRAINING DATA
-
-        faces = []
-        ids = []
-
-        training_window = "Training"
-
-        cv2.namedWindow(
-            training_window,
-            cv2.WINDOW_NORMAL
-        )
-
-        cv2.resizeWindow(
-            training_window,
-            450,
-            450
-        )
-
-        # READ IMAGES
-
-        for image_path in image_files:
-
-            try:
-
-                filename = os.path.basename(
-                    image_path
-                )
-
-                # EXPECTED:
-                # User.213.1.jpg
-                # User.213.2.jpg
-                # User.213.3.jpg
-
-                parts = filename.split(".")
-
-                if len(parts) < 3:
-                    continue
-
-                try:
-
-                    student_id = int(
-                        parts[1]
-                    )
-
-                except ValueError:
-                    continue
-
-                # CHECK ID IN DATABASE
-
-                if student_id not in student_data:
-
-                    print(
-                        "Skipped - Student ID not in database:",
-                        filename
-                    )
-
-                    continue
-
-                student_name = student_data[
-                    student_id
-                ]
-
-                # LOAD IMAGE
-
-                img = Image.open(
-                    image_path
-                ).convert("L")
-
-                image_np = np.array(
-                    img,
-                    dtype=np.uint8
-                )
-
-                # ADD TRAINING DATA
-
-                faces.append(
-                    image_np
-                )
-
-                ids.append(
-                    student_id
-                )
-
-                # SHOW TRAINING INFORMATION
-
-                display_img = cv2.cvtColor(
-                    image_np,
-                    cv2.COLOR_GRAY2BGR
-                )
-
-                cv2.putText(
-                    display_img,
-                    f"ID: {student_id}",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8,
-                    (0, 255, 0),
-                    2
-                )
-
-                cv2.putText(
-                    display_img,
-                    f"Name: {student_name}",
-                    (10, 65),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.65,
-                    (0, 255, 0),
-                    2
-                )
-
-                cv2.imshow(
-                    training_window,
-                    display_img
-                )
-
-                cv2.waitKey(1)
-
-                print(
-                    f"Training: {filename} -> "
-                    f"ID={student_id} -> "
-                    f"Name={student_name}"
-                )
-
-            except Exception as e:
-
-                print(
-                    "Error in image:",
-                    image_path
-                )
-
-                print(
-                    "Error:",
-                    e
-                )
-
-                continue
-
-        # CHECK VALID DATA
-
-        if len(faces) == 0:
-
-            cv2.destroyAllWindows()
-
-            messagebox.showerror(
-                "Error",
-                "Valid training images not found!\n\n"
-                "Check your data folder filenames.",
-                parent=self.root
-            )
-
-            return
-
-        # TRAIN
-
-        try:
-
-            ids = np.array(
-                ids,
-                dtype=np.int32
-            )
-
-            clf = cv2.face.LBPHFaceRecognizer_create()
-
-            clf.train(
-                faces,
-                ids
-            )
-
-            # SAVE TEMP CLASSIFIER
-
-            clf.write(
-                temp_path
-            )
-
-            # REPLACE OLD CLASSIFIER
-
-            if os.path.exists(
-                classifier_path
-            ):
-
-                os.remove(
-                    classifier_path
-                )
-
-            os.replace(
-                temp_path,
-                classifier_path
-            )
-
-            cv2.destroyAllWindows()
-
-            # TRAINING SUCCESS
-
-            unique_ids = sorted(
-                set(ids.tolist())
-            )
-
-            trained_students = []
-
-            for sid in unique_ids:
-
-                trained_students.append(
-                    f"{sid} - "
-                    f"{student_data.get(sid, 'Unknown')}"
-                )
-
+        success, message, trained_students = train_dataset_engine(self.base_dir, show_window=True)
+        if success:
+            summary = "\n".join(trained_students)
             messagebox.showinfo(
                 "Training Completed",
-
-                "✅ Training datasets completed!\n\n"
-                "Students trained:\n\n"
-                +
-                "\n".join(
-                    trained_students
-                ),
-
+                f"✅ Training datasets completed successfully!\n\n"
+                f"{message}\n\n"
+                f"Students trained:\n{summary}",
                 parent=self.root
             )
-
-        except Exception as e:
-
-            cv2.destroyAllWindows()
-
-            if os.path.exists(
-                temp_path
-            ):
-
-                os.remove(
-                    temp_path
-                )
-
+        else:
             messagebox.showerror(
                 "Training Error",
-                str(e),
+                message,
                 parent=self.root
             )
 

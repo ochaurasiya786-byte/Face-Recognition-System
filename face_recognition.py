@@ -1012,33 +1012,35 @@ class Face_Recognition:
             results = cursor.fetchall()
 
             for row in results:
-
                 try:
-
-                    student_id = int(
-                        row[0]
-                    )
-
-                    student_data[
-                        student_id
-                    ] = {
-
-                        "roll": str(
-                            row[1]
-                        ).strip(),
-
-                        "name": str(
-                            row[2]
-                        ).strip(),
-
-                        "department": str(
-                            row[3]
-                        ).strip()
+                    student_id = int(row[0])
+                    student_data[student_id] = {
+                        "roll": str(row[1]).strip() if row[1] else "",
+                        "name": str(row[2]).strip() if row[2] else f"Student {student_id}",
+                        "department": str(row[3]).strip() if row[3] else "General"
                     }
-
                 except Exception:
-
                     continue
+
+            # Also include student_requests as backup info
+            try:
+                cursor.execute("""
+                    SELECT Student_ID, Roll, Student_Name, Dep
+                    FROM student_requests
+                """)
+                for row in cursor.fetchall():
+                    try:
+                        sid = int(row[0])
+                        if sid not in student_data:
+                            student_data[sid] = {
+                                "roll": str(row[1]).strip() if row[1] else "",
+                                "name": str(row[2]).strip() if row[2] else f"Student {sid}",
+                                "department": str(row[3]).strip() if row[3] else "General"
+                            }
+                    except Exception:
+                        continue
+            except Exception:
+                pass
 
             cursor.close()
             conn.close()
@@ -1182,29 +1184,22 @@ class Face_Recognition:
 
                     continue
 
-                confidence = int(
-                    100 *
-                    (
-                        1 -
-                        distance / 300
-                    )
+                # STRICT FACE RECOGNITION:
+                # In LBPH, distance measures difference (0 = exact match).
+                # Setting threshold <= 48 eliminates strangers, false positives and loose matches.
+                STRICT_DISTANCE_THRESHOLD = 48.0
+
+                is_strictly_recognized = (
+                    distance <= STRICT_DISTANCE_THRESHOLD
+                    and predicted_id in student_data
                 )
 
-                confidence = max(
-                    0,
-                    min(
-                        confidence,
-                        100
-                    )
-                )
+                # Realistic Confidence % (100% at dist=0, down to 0% at dist >= 60)
+                confidence = max(0, min(100, int(100 * (1.0 - distance / 60.0))))
 
-                # RECOGNIZED FACE
+                # RECOGNIZED FACE (STRICT)
 
-                if (
-                    confidence >= 80
-                    and
-                    predicted_id in student_data
-                ):
+                if is_strictly_recognized:
 
                     student_id = int(
                         predicted_id
@@ -1548,7 +1543,7 @@ class Face_Recognition:
 
                     cv2.putText(
                         img,
-                        "Unknown Face",
+                        f"Unknown Face (Dist: {int(distance)})",
                         (
                             x,
                             y - 10

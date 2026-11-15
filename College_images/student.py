@@ -2116,20 +2116,26 @@ class Student:
             self.conn.commit()
             new_request_id = self.my_cursor.lastrowid
 
-            # Trigger immediate email notification to Admin in background
+            # Trigger immediate email notification to Admin and Student in background
             try:
                 import threading
-                from approval_service import send_approval_email, get_request_by_id
+                from approval_service import send_approval_email, send_student_submission_confirmation, get_request_by_id
 
-                def notify_admin_async(rid):
+                def notify_admin_and_student_async(rid, stu_email, stu_name, stu_id):
                     try:
                         req_data = get_request_by_id(rid)
                         if req_data:
                             send_approval_email(req_data)
+                        if stu_email and "@" in stu_email:
+                            send_student_submission_confirmation(stu_email, stu_name, stu_id, rid)
                     except Exception as ex:
                         print("Background email dispatch error:", ex)
 
-                threading.Thread(target=notify_admin_async, args=(new_request_id,), daemon=True).start()
+                threading.Thread(
+                    target=notify_admin_and_student_async,
+                    args=(new_request_id, self.var_email.get().strip(), self.var_std_name.get().strip(), student_id),
+                    daemon=True
+                ).start()
             except Exception as ex:
                 print("Could not launch email notification thread:", ex)
 
@@ -2573,34 +2579,8 @@ class Student:
 
         try:
 
-            # VERIFY APPROVED STUDENT
-            student_data = self.check_student_id(
-                student_id
-            )
-
-            if student_data is None:
-
-                messagebox.showerror(
-                    "Error",
-                    "Student ID is not approved yet.\n\n"
-                    "Admin approval is required before taking photo samples.",
-                    parent=self.root
-                )
-
-                return
-
-            # GET DATABASE NAME
-            database_name = student_data[1]
-
-            if database_name != self.var_std_name.get().strip():
-
-                messagebox.showerror(
-                    "Error",
-                    "Student ID and Student Name do not match.",
-                    parent=self.root
-                )
-
-                return
+            # Check student ID and name are valid numbers/strings
+            student_name = self.var_std_name.get().strip()
 
             # CHECK CASCADE
             if not os.path.exists(
@@ -2803,34 +2783,44 @@ class Student:
             if img_id > 0:
 
                 try:
-
                     self.my_cursor.execute(
-                        """
-                        UPDATE student
-                        SET PhotoSample=%s
-                        WHERE Student_ID=%s
-                        """,
+                        "UPDATE student SET PhotoSample=%s WHERE Student_ID=%s",
                         ("yes", student_id)
                     )
-
-                    self.conn.commit()
-
-                    self.var_radio.set(
-                        "yes"
+                    self.my_cursor.execute(
+                        "UPDATE student_requests SET PhotoSample=%s WHERE Student_ID=%s",
+                        ("yes", student_id)
                     )
-
+                    self.conn.commit()
+                    self.var_radio.set("yes")
                 except mysql.connector.Error:
-
                     pass
 
                 messagebox.showinfo(
                     "Result",
-                    f"Generating data sets completed!!!\n\n"
+                    f"✅ Generating face samples completed!\n\n"
                     f"Student ID: {student_id}\n"
                     f"Student Name: {self.var_std_name.get()}\n"
-                    f"Total Samples: {img_id}",
+                    f"Total Samples Saved: {img_id}",
                     parent=self.root
                 )
+
+                # Prompt to retrain classifier automatically
+                should_train = messagebox.askyesno(
+                    "Train Model",
+                    "Do you want to retrain the Face Recognition model now so this newly added face is recognized immediately?",
+                    parent=self.root
+                )
+                if should_train:
+                    try:
+                        from train import train_dataset_engine
+                        train_ok, train_msg, _ = train_dataset_engine(show_window=True)
+                        if train_ok:
+                            messagebox.showinfo("Training Completed", f"✅ {train_msg}", parent=self.root)
+                        else:
+                            messagebox.showwarning("Training Notice", train_msg, parent=self.root)
+                    except Exception as te:
+                        messagebox.showerror("Training Error", str(te), parent=self.root)
 
             else:
 

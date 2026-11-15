@@ -233,6 +233,17 @@ def process_approval_action(request_id, action, db_config=None):
             )
 
             conn.commit()
+
+            # Dispatch automated email response to student
+            student_email = row[10]
+            if student_email and "@" in str(student_email):
+                import threading
+                threading.Thread(
+                    target=send_student_decision_email,
+                    args=(student_email, student_name, student_id, "approve", request_id),
+                    daemon=True
+                ).start()
+
             return {
                 "success": True,
                 "status": "approved",
@@ -252,6 +263,17 @@ def process_approval_action(request_id, action, db_config=None):
             )
 
             conn.commit()
+
+            # Dispatch automated email response to student
+            student_email = row[10]
+            if student_email and "@" in str(student_email):
+                import threading
+                threading.Thread(
+                    target=send_student_decision_email,
+                    args=(student_email, student_name, student_id, "reject", request_id),
+                    daemon=True
+                ).start()
+
             return {
                 "success": True,
                 "status": "rejected",
@@ -315,9 +337,9 @@ def send_approval_email(
     else:
         raise ValueError("Invalid request_data format.")
 
-    admin_email = admin_email or os.getenv("ADMIN_EMAIL", "ochaurasiya786@gmail.com")
-    smtp_email = smtp_email or os.getenv("SMTP_EMAIL", admin_email)
-    smtp_app_password = smtp_app_password or os.getenv("SMTP_APP_PASSWORD", "")
+    admin_email = admin_email or os.getenv("ADMIN_EMAIL") or "ochaurasiya786@gmail.com"
+    smtp_email = smtp_email or os.getenv("SMTP_EMAIL") or admin_email
+    smtp_app_password = smtp_app_password or os.getenv("SMTP_APP_PASSWORD") or "fxil mqhs tjbg matl"
 
     if not smtp_app_password:
         return False, "SMTP_APP_PASSWORD is not configured in .env."
@@ -528,6 +550,180 @@ def send_approval_email(
         return True, f"Approval notification email sent for request #{request_id}."
     except Exception as e:
         err_msg = f"Failed to send email: {str(e)}"
+        print(err_msg)
+        return False, err_msg
+
+
+def send_student_decision_email(student_email, student_name, student_id, action, request_id=None, smtp_email=None, smtp_app_password=None):
+    """
+    Sends an automated notification email directly to the student when their registration is Approved or Rejected.
+    """
+    if not student_email or "@" not in str(student_email):
+        return False, "No valid student email provided."
+
+    smtp_email = smtp_email or os.getenv("SMTP_EMAIL") or "ochaurasiya786@gmail.com"
+    smtp_app_password = smtp_app_password or os.getenv("SMTP_APP_PASSWORD") or "fxil mqhs tjbg matl"
+
+    action = str(action).lower().strip()
+    is_approved = (action == "approve")
+
+    subject = f"{'🎉 Registration Approved' if is_approved else '⚠️ Registration Update'}: Student ID #{student_id} ({student_name})"
+    status_text = "APPROVED" if is_approved else "REJECTED"
+    badge_bg = "#10b981" if is_approved else "#ef4444"
+    heading_text = "Your Registration Has Been Approved!" if is_approved else "Your Registration Was Not Approved"
+    message_text = (
+        "Congratulations! Your student registration has been reviewed and approved by the department administrator. Your profile is now active in the system, and your face is eligible for automated attendance."
+        if is_approved else
+        "Your student registration request has been reviewed by the department administrator and was not approved. Please contact the department office if you need further clarification."
+    )
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = smtp_email
+    msg["To"] = str(student_email).strip()
+
+    plain_content = f"""Dear {student_name},
+
+{heading_text}
+
+Status: {status_text}
+Student ID: {student_id}
+Request ID: #{request_id or 'N/A'}
+
+{message_text}
+
+Thank you,
+AI Face Recognition Attendance Management System
+"""
+    msg.set_content(plain_content)
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; margin: 0; padding: 24px; color: #1f2937;">
+        <div style="max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+            <div style="background: linear-gradient(135deg, #071426, #1e3a8a); color: white; padding: 24px; text-align: center;">
+                <h2 style="margin: 0; font-size: 20px;">AI Face Recognition Attendance System</h2>
+                <p style="margin: 6px 0 0; opacity: 0.85; font-size: 13px;">Khwaja Moinuddin Chishti Language University</p>
+            </div>
+            <div style="padding: 24px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <span style="display: inline-block; background: {badge_bg}; color: white; font-weight: bold; font-size: 12px; padding: 6px 16px; border-radius: 20px; letter-spacing: 0.5px;">
+                        {status_text}
+                    </span>
+                    <h3 style="color: #111827; margin: 14px 0 6px; font-size: 18px;">{heading_text}</h3>
+                    <p style="color: #4b5563; font-size: 14px; line-height: 1.5; margin: 0;">{message_text}</p>
+                </div>
+                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <table style="width: 100%; font-size: 14px; color: #374151; border-collapse: collapse;">
+                        <tr><td style="padding: 5px 0; color: #6b7280; width: 130px;">Student Name:</td><td style="padding: 5px 0; font-weight: bold;">{student_name}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280;">Student ID:</td><td style="padding: 5px 0; font-weight: bold;">{student_id}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280;">Status:</td><td style="padding: 5px 0; font-weight: bold; color: {badge_bg};">{status_text}</td></tr>
+                    </table>
+                </div>
+                <div style="text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: 14px;">
+                    This is an automated notification from the Attendance Management System.
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    msg.add_alternative(html_content, subtype="html")
+
+    try:
+        clean_password = smtp_app_password.replace(" ", "")
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+            server.ehlo()
+            server.starttls(context=ssl.create_default_context())
+            server.login(smtp_email, clean_password)
+            server.send_message(msg)
+        return True, f"Decision email sent to student {student_email}."
+    except Exception as e:
+        err_msg = f"Failed to send decision email: {str(e)}"
+        print(err_msg)
+        return False, err_msg
+
+
+def send_student_submission_confirmation(student_email, student_name, student_id, request_id, smtp_email=None, smtp_app_password=None):
+    """
+    Sends an automated confirmation email to the student immediately after they submit registration.
+    """
+    if not student_email or "@" not in str(student_email):
+        return False, "No valid student email provided."
+
+    smtp_email = smtp_email or os.getenv("SMTP_EMAIL") or "ochaurasiya786@gmail.com"
+    smtp_app_password = smtp_app_password or os.getenv("SMTP_APP_PASSWORD") or "fxil mqhs tjbg matl"
+
+    subject = f"Registration Submitted: Request #{request_id} ({student_name})"
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = smtp_email
+    msg["To"] = str(student_email).strip()
+
+    plain_content = f"""Dear {student_name},
+
+Your registration request #{request_id} for Student ID {student_id} has been submitted successfully!
+
+Status: PENDING ADMIN APPROVAL
+
+An approval notification has been sent to the Department Administrator. Once approved, your profile will be activated in the attendance system.
+
+Thank you,
+AI Face Recognition Attendance Management System
+"""
+    msg.set_content(plain_content)
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; margin: 0; padding: 24px; color: #1f2937;">
+        <div style="max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+            <div style="background: linear-gradient(135deg, #071426, #1e3a8a); color: white; padding: 24px; text-align: center;">
+                <h2 style="margin: 0; font-size: 20px;">AI Face Recognition Attendance System</h2>
+                <p style="margin: 6px 0 0; opacity: 0.85; font-size: 13px;">Khwaja Moinuddin Chishti Language University</p>
+            </div>
+            <div style="padding: 24px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <span style="display: inline-block; background: #3b82f6; color: white; font-weight: bold; font-size: 12px; padding: 6px 16px; border-radius: 20px; letter-spacing: 0.5px;">
+                        SUBMITTED
+                    </span>
+                    <h3 style="color: #111827; margin: 14px 0 6px; font-size: 18px;">Registration Submitted Successfully</h3>
+                    <p style="color: #4b5563; font-size: 14px; line-height: 1.5; margin: 0;">
+                        Your registration has been forwarded to the Administrator for verification and approval.
+                    </p>
+                </div>
+                <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <table style="width: 100%; font-size: 14px; color: #374151; border-collapse: collapse;">
+                        <tr><td style="padding: 5px 0; color: #6b7280; width: 130px;">Request ID:</td><td style="padding: 5px 0; font-weight: bold;">#{request_id}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280;">Student Name:</td><td style="padding: 5px 0; font-weight: bold;">{student_name}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280;">Student ID:</td><td style="padding: 5px 0; font-weight: bold;">{student_id}</td></tr>
+                        <tr><td style="padding: 5px 0; color: #6b7280;">Status:</td><td style="padding: 5px 0; font-weight: bold; color: #f59e0b;">Pending Admin Approval</td></tr>
+                    </table>
+                </div>
+                <div style="text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: 14px;">
+                    You will receive another email as soon as your registration is approved.
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    msg.add_alternative(html_content, subtype="html")
+
+    try:
+        clean_password = smtp_app_password.replace(" ", "")
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+            server.ehlo()
+            server.starttls(context=ssl.create_default_context())
+            server.login(smtp_email, clean_password)
+            server.send_message(msg)
+        return True, f"Submission confirmation email sent to student {student_email}."
+    except Exception as e:
+        err_msg = f"Failed to send confirmation email: {str(e)}"
         print(err_msg)
         return False, err_msg
 

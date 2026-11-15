@@ -429,16 +429,20 @@ def submit_registration_api():
         conn.commit()
         new_request_id = cursor.lastrowid
 
-        # Dispatch async email notification to Admin
-        def notify_async(rid):
+        # Dispatch async email notification to Admin and Student
+        stu_email = data.get("email", "").strip()
+        def notify_async(rid, s_email, s_name, s_id):
             try:
                 req_data = get_request_by_id(rid)
                 if req_data:
                     send_approval_email(req_data)
+                if s_email and "@" in s_email:
+                    from approval_service import send_student_submission_confirmation
+                    send_student_submission_confirmation(s_email, s_name, s_id, rid)
             except Exception as ex:
                 print("Email dispatch error:", ex)
 
-        threading.Thread(target=notify_async, args=(new_request_id,), daemon=True).start()
+        threading.Thread(target=notify_async, args=(new_request_id, stu_email, student_name, student_id), daemon=True).start()
 
         return jsonify({
             "success": True,
@@ -663,6 +667,56 @@ def api_mark_face_attendance():
         "time": now_time,
         "date": now_date,
         "message": f"Attendance marked successfully for {student[1]} (ID: {student[0]})!"
+    })
+
+@app.route("/api/train-classifier", methods=["POST"])
+def api_train_classifier():
+    try:
+        from train import train_dataset_engine
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        success, message, trained_students = train_dataset_engine(base_dir=base_dir, show_window=False)
+        return jsonify({
+            "success": success,
+            "message": message,
+            "students": trained_students
+        }), (200 if success else 400)
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Training error: {str(e)}"}), 500
+
+@app.route("/api/upload-face-samples", methods=["POST"])
+def api_upload_face_samples():
+    data = request.get_json(silent=True) or {}
+    student_id = str(data.get("student_id", "")).strip()
+    images_base64 = data.get("images", [])
+
+    if not student_id or not images_base64:
+        return jsonify({"success": False, "message": "Student ID and image data are required."}), 400
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+    os.makedirs(data_dir, exist_ok=True)
+
+    import base64
+    saved_count = 0
+    existing = [f for f in os.listdir(data_dir) if f.startswith(f"user.{student_id}.")]
+    start_idx = len(existing) + 1
+
+    for i, b64_str in enumerate(images_base64):
+        try:
+            if "," in b64_str:
+                b64_str = b64_str.split(",")[1]
+            img_bytes = base64.b64decode(b64_str)
+            target_path = os.path.join(data_dir, f"user.{student_id}.{start_idx + i}.jpg")
+            with open(target_path, "wb") as f:
+                f.write(img_bytes)
+            saved_count += 1
+        except Exception as e:
+            print("Error saving sample:", e)
+
+    return jsonify({
+        "success": True,
+        "saved_count": saved_count,
+        "message": f"Saved {saved_count} face sample(s) for Student ID {student_id}."
     })
 
 @app.route("/health")
