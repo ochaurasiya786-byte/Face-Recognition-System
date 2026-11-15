@@ -632,7 +632,7 @@ def api_chat():
 @app.route("/api/mark-face-attendance", methods=["POST"])
 def api_mark_face_attendance():
     data = request.get_json(silent=True) or {}
-    student_id = str(data.get("student_id", "213")).strip()
+    student_id = str(data.get("student_id", "987")).strip()
     student = check_student_id(student_id)
 
     if not student:
@@ -640,6 +640,36 @@ def api_mark_face_attendance():
             "success": False,
             "message": f"Student ID '{student_id}' not found in database. Please register first."
         }), 404
+
+    # Geolocation 4 KM boundary check
+    req_lat = data.get("latitude")
+    req_lon = data.get("longitude")
+    distance_meters = 50.0
+    recorded_lat = COLLEGE_LAT
+    recorded_lon = COLLEGE_LON
+
+    if req_lat is not None and req_lon is not None:
+        try:
+            req_lat = float(req_lat)
+            req_lon = float(req_lon)
+            distance_meters = round(calculate_distance(req_lat, req_lon, COLLEGE_LAT, COLLEGE_LON), 1)
+            recorded_lat = req_lat
+            recorded_lon = req_lon
+
+            # STRICT 4 KILOMETRE LIMIT
+            if distance_meters > RADIUS:
+                dist_km = round(distance_meters / 1000.0, 2)
+                return jsonify({
+                    "success": False,
+                    "outside_boundary": True,
+                    "distance": distance_meters,
+                    "distance_km": dist_km,
+                    "latitude": req_lat,
+                    "longitude": req_lon,
+                    "message": f"❌ Location Restriction: You are {dist_km} km away from campus. Attendance cannot be marked because you are outside the 4 km boundary."
+                }), 403
+        except (ValueError, TypeError) as e:
+            print("Location parse error:", e)
 
     now = datetime.now()
     now_time = now.strftime("%H:%M:%S")
@@ -653,8 +683,8 @@ def api_mark_face_attendance():
             writer = csv.writer(f)
             writer.writerow([
                 student[0], "1", student[1], student[2],
-                now_time, now_date, str(COLLEGE_LAT), str(COLLEGE_LON),
-                "50.0", "Matched", "Verified", "Verified", "Present"
+                now_time, now_date, str(recorded_lat), str(recorded_lon),
+                str(distance_meters), "Matched", "Verified", "Verified", "Present"
             ])
     except Exception as e:
         print("Error recording attendance:", e)
@@ -666,6 +696,9 @@ def api_mark_face_attendance():
         "department": student[2],
         "time": now_time,
         "date": now_date,
+        "latitude": recorded_lat,
+        "longitude": recorded_lon,
+        "distance": distance_meters,
         "message": f"Attendance marked successfully for {student[1]} (ID: {student[0]})!"
     })
 
