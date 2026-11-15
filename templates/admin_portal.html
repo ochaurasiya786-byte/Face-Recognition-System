@@ -279,6 +279,7 @@
 
     async function executeAction(requestId, action) {
         const actionContainer = document.getElementById(`actions-${requestId}`);
+        const row = document.getElementById(`row-${requestId}`);
         actionContainer.innerHTML = '<span style="font-size:0.85rem;color:var(--text-muted);">Processing...</span>';
 
         try {
@@ -292,6 +293,28 @@
                 const label = action === 'approve' ? 'Approved' : 'Rejected';
                 actionContainer.innerHTML = `<span class="badge ${badgeClass}">${label}</span>`;
                 showToast(`Request #${requestId} has been ${label.toLowerCase()}.`);
+
+                // Auto-disappear: smoothly fade out and remove row
+                setTimeout(() => {
+                    if (row) {
+                        row.style.transition = 'all 0.5s ease';
+                        row.style.opacity = '0';
+                        setTimeout(() => {
+                            row.remove();
+                            const tbody = document.querySelector('#tabPending tbody');
+                            if (tbody && tbody.querySelectorAll('tr').length === 0) {
+                                const container = document.getElementById('tabPending');
+                                container.innerHTML = `
+                                    <div class="card empty-state">
+                                        <div class="empty-icon">&#10024;</div>
+                                        <h3>No Pending Registration Requests</h3>
+                                        <p>All student registrations have been reviewed. When new requests arrive, they will appear here.</p>
+                                    </div>
+                                `;
+                            }
+                        }, 500);
+                    }
+                }, 600);
             } else {
                 actionContainer.innerHTML = `
                     <button onclick="executeAction(${requestId}, 'approve')" class="btn btn-success btn-sm">&#10004; Approve</button>

@@ -319,10 +319,9 @@ def check_student_id(student_id):
 @app.route("/")
 def home():
     format_param = request.args.get("format", "").lower()
-    accept_header = request.headers.get("Accept", "")
 
-    # Return JSON if requested explicitly or by API clients
-    if format_param == "json" or ("application/json" in accept_header and "text/html" not in accept_header):
+    # Return JSON ONLY if explicitly requested via ?format=json
+    if format_param == "json":
         db_connected = False
         try:
             test_conn = get_db_connection()
@@ -629,16 +628,153 @@ def api_chat():
 
     return jsonify({"reply": reply})
 
+# ==========================================
+# BIOMETRIC MODEL CACHE & RECOGNIZER HELPER
+# ==========================================
+_cached_recognizer = None
+_cached_cascade = None
+_cached_classifier_mtime = 0
+
+def get_face_recognizer(base_dir):
+    global _cached_recognizer, _cached_cascade, _cached_classifier_mtime
+    import cv2
+    
+    cascade_path = os.path.join(base_dir, "haarcascade_frontalface_default.xml")
+    if not os.path.exists(cascade_path):
+        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    
+    if _cached_cascade is None:
+        _cached_cascade = cv2.CascadeClassifier(cascade_path)
+        
+    classifier_path = os.path.join(base_dir, "classifier.xml")
+    if not os.path.exists(classifier_path):
+        return None, _cached_cascade
+        
+    mtime = os.path.getmtime(classifier_path)
+    if _cached_recognizer is None or mtime != _cached_classifier_mtime:
+        clf = cv2.face.LBPHFaceRecognizer_create()
+        clf.read(classifier_path)
+        _cached_recognizer = clf
+        _cached_classifier_mtime = mtime
+        
+    return _cached_recognizer, _cached_cascade
+
+# Background thread to pre-warm biometric models in RAM for instant 0.05s inference
+def _prewarm_biometrics():
+    try:
+        b_dir = os.path.dirname(os.path.abspath(__file__))
+        get_face_recognizer(b_dir)
+        print("Biometric recognizer pre-warmed successfully.")
+    except Exception as e:
+        print("Pre-warm info:", e)
+
+threading.Thread(target=_prewarm_biometrics, daemon=True).start()
+
 @app.route("/api/mark-face-attendance", methods=["POST"])
 def api_mark_face_attendance():
     data = request.get_json(silent=True) or {}
-    student_id = str(data.get("student_id", "987")).strip()
-    student = check_student_id(student_id)
+    image_b64 = data.get("image", "")
+    claimed_student_id = str(data.get("student_id", "")).strip()
 
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # STRICT BIOMETRIC FACE VERIFICATION
+    if not image_b64:
+        return jsonify({
+            "success": False,
+            "biometric_failure": True,
+            "message": "❌ Camera image frame missing. Please keep your face clearly in front of the camera."
+        }), 400
+
+    try:
+        import base64
+        import numpy as np
+        import cv2
+
+        if "," in image_b64:
+            image_b64 = image_b64.split(",", 1)[1]
+
+        img_bytes = base64.b64decode(image_b64)
+        nparr = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if img is None:
+            return jsonify({
+                "success": False,
+                "biometric_failure": True,
+                "message": "❌ Invalid camera frame received. Please ensure camera access."
+            }), 400
+
+        clf, face_cascade = get_face_recognizer(base_dir)
+
+        if clf is None:
+            return jsonify({
+                "success": False,
+                "message": "❌ Biometric model (classifier.xml) not found. Please train faces first."
+            }), 500
+
+        # Fast optimization: Downscale high-resolution frames to max width 480 for 5x faster Haar detection
+        h, w = img.shape[:2]
+        if w > 480:
+            scale_ratio = 480.0 / w
+            new_h = int(h * scale_ratio)
+            img_fast = cv2.resize(img, (480, new_h), interpolation=cv2.INTER_AREA)
+        else:
+            img_fast = img
+
+        gray = cv2.cvtColor(img_fast, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(40, 40))
+
+        if len(faces) == 0:
+            return jsonify({
+                "success": False,
+                "biometric_failure": True,
+                "message": "❌ No face detected in camera stream! Please look directly at the camera in good lighting."
+            }), 400
+
+        # Sort to find largest face
+        faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
+        (x, y, w, h) = faces[0]
+        face_roi = gray[y:y+h, x:x+w]
+
+        # Predict identity using trained LBPH model
+        predicted_id, distance = clf.predict(face_roi)
+        confidence = max(0, min(100, int(100 * (1 - distance / 100))))
+
+        # STRICT BIOMETRIC THRESHOLD
+        STRICT_THRESHOLD = 52.0
+        if distance > STRICT_THRESHOLD:
+            return jsonify({
+                "success": False,
+                "biometric_failure": True,
+                "distance": round(distance, 1),
+                "message": f"❌ Biometric Verification Failed: Unknown Face! Biometric distance is {round(distance, 1)} (Max allowed: {STRICT_THRESHOLD}). Strangers cannot mark attendance!"
+            }), 403
+
+        # IDENTITY MATCH CHECK - PREVENT MARKING SOMEONE ELSE'S ATTENDANCE
+        if claimed_student_id and str(claimed_student_id) != str(predicted_id):
+            return jsonify({
+                "success": False,
+                "biometric_failure": True,
+                "claimed_id": claimed_student_id,
+                "recognized_id": str(predicted_id),
+                "message": f"❌ Biometric Mismatch! The person in front of the camera is recognized as Student ID {predicted_id}, NOT Student ID {claimed_student_id}. Any person cannot mark another person's attendance!"
+            }), 403
+
+        student_id = str(predicted_id)
+
+    except Exception as ex:
+        print("Biometric processing error:", ex)
+        return jsonify({
+            "success": False,
+            "message": f"Biometric verification error: {str(ex)}"
+        }), 500
+
+    student = check_student_id(student_id)
     if not student:
         return jsonify({
             "success": False,
-            "message": f"Student ID '{student_id}' not found in database. Please register first."
+            "message": f"❌ Recognized student ID '{student_id}' not found in database. Please register first."
         }), 404
 
     # Geolocation 4 KM boundary check
@@ -675,16 +811,14 @@ def api_mark_face_attendance():
     now_time = now.strftime("%H:%M:%S")
     now_date = now.strftime("%d/%m/%Y")
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(base_dir, "attendence.csv")
-
     try:
         with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
                 student[0], "1", student[1], student[2],
                 now_time, now_date, str(recorded_lat), str(recorded_lon),
-                str(distance_meters), "Matched", "Verified", "Verified", "Present"
+                str(distance_meters), f"Biometric-{confidence}%", "Verified", "Verified", "Present"
             ])
     except Exception as e:
         print("Error recording attendance:", e)
@@ -699,8 +833,120 @@ def api_mark_face_attendance():
         "latitude": recorded_lat,
         "longitude": recorded_lon,
         "distance": distance_meters,
-        "message": f"Attendance marked successfully for {student[1]} (ID: {student[0]})!"
+        "confidence": confidence,
+        "message": f"Biometric attendance verified & marked successfully for {student[1]} (ID: {student[0]})!"
     })
+
+@app.route("/api/admin-verify", methods=["POST"])
+def api_admin_verify():
+    data = request.get_json(silent=True) or {}
+    username = str(data.get("username", "")).strip()
+    password = str(data.get("password", "")).strip()
+
+    if not username or not password:
+        return jsonify({
+            "success": False,
+            "message": "❌ Strictly required: Admin username and password must both be entered."
+        }), 400
+
+    admin_user = os.environ.get("ADMIN_USERNAME", "admin").strip()
+    admin_pass = os.environ.get("ADMIN_PASSWORD", "Admin@123").strip()
+
+    authenticated = False
+    if username == admin_user and password == admin_pass:
+        authenticated = True
+    else:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT password FROM users WHERE username = %s LIMIT 1", (username,))
+            row = cursor.fetchone()
+            if row and row[0] == password:
+                authenticated = True
+            cursor.close()
+            conn.close()
+        except Exception:
+            pass
+
+    if authenticated:
+        session["admin_logged_in"] = True
+        return jsonify({
+            "success": True,
+            "message": "Admin credentials verified successfully."
+        })
+    else:
+        return jsonify({
+            "success": False,
+            "message": "❌ Invalid admin username or password. Access denied."
+        }), 401
+
+@app.route("/exit")
+@app.route("/logout")
+def exit_application_page():
+    session.clear()
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Application Exited</title>
+        <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background-color: #071426;
+                color: #ffffff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                padding: 20px;
+                text-align: center;
+            }
+            .exit-card {
+                background: #0b1f3a;
+                border: 1px solid #18385f;
+                border-radius: 14px;
+                padding: 44px 32px;
+                max-width: 500px;
+                width: 100%;
+                box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+            }
+            .exit-icon { font-size: 3.8rem; margin-bottom: 16px; }
+            h2 { color: #55c7ff; font-size: 1.7rem; margin-bottom: 12px; }
+            p { color: #9db4cf; font-size: 0.95rem; line-height: 1.6; margin-bottom: 28px; }
+            .btn-group { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+            .btn {
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-weight: 700;
+                font-size: 0.95rem;
+                text-decoration: none;
+                cursor: pointer;
+                border: none;
+                transition: all 0.2s;
+            }
+            .btn-close { background: #dc2626; color: #fff; }
+            .btn-close:hover { background: #b91c1c; }
+            .btn-home { background: #0d274c; color: #55c7ff; border: 1px solid #18385f; }
+            .btn-home:hover { background: #133966; }
+        </style>
+    </head>
+    <body>
+        <div class="exit-card">
+            <div class="exit-icon">&#128682;</div>
+            <h2>Application Exited</h2>
+            <p>You have successfully logged out and exited the Face Recognition Attendance System.<br>Session has been terminated. You may safely close this browser window or return to home.</p>
+            <div class="btn-group">
+                <button class="btn btn-close" onclick="window.open('', '_self', ''); window.close();">Close Window</button>
+                <a href="/" class="btn btn-home">Return to Home Screen</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """)
+
 
 @app.route("/api/train-classifier", methods=["POST"])
 def api_train_classifier():

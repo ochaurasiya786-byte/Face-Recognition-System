@@ -2,17 +2,23 @@ import os
 import ssl
 import html
 import smtplib
+import threading
 from email.message import EmailMessage
 from pathlib import Path
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 import mysql.connector
+from mysql.connector import pooling
 
 # Load environment variables
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 ACTION_SALT = "face-attendance-student-approval"
+
+# Thread-safe database connection pool for ultra-fast queries
+_db_pool = None
+_db_pool_lock = threading.Lock()
 
 
 def get_secret_key():
@@ -49,9 +55,30 @@ def get_db_config():
 
 
 def get_db_connection(config=None):
-    if config is None:
-        config = get_db_config()
-    return mysql.connector.connect(**config)
+    global _db_pool
+    if config is not None:
+        return mysql.connector.connect(**config)
+
+    if _db_pool is None:
+        with _db_pool_lock:
+            if _db_pool is None:
+                cfg = get_db_config()
+                try:
+                    _db_pool = pooling.MySQLConnectionPool(
+                        pool_name="face_app_pool",
+                        pool_size=5,
+                        pool_reset_session=True,
+                        **cfg
+                    )
+                except Exception as e:
+                    print("Connection pool initialization fallback:", e)
+                    return mysql.connector.connect(**cfg)
+
+    try:
+        return _db_pool.get_connection()
+    except Exception:
+        # Fallback to direct connection if pool is momentarily busy
+        return mysql.connector.connect(**get_db_config())
 
 
 def get_base_url(explicit_url=None):

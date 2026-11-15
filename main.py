@@ -910,13 +910,19 @@ class Face_Recognition_System:
     def exit_system(self):
 
         answer = messagebox.askyesno(
-            "Exit",
-            "Are you sure you want to exit?",
+            "Exit Application",
+            "Are you sure you want to completely exit the application?",
             parent=self.root
         )
 
         if answer:
-            self.root.destroy()
+            try:
+                self.root.destroy()
+            except Exception:
+                pass
+            import sys, os
+            sys.exit(0)
+            os._exit(0)
 
 
 # START SYSTEM
