@@ -68,14 +68,8 @@ class Student:
 
         # MYSQL CONNECTION
         try:
-
-            self.conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="Omkar@7518",
-                database="student"
-            )
-
+            from approval_service import get_db_connection
+            self.conn = get_db_connection()
             self.my_cursor = self.conn.cursor()
 
         except mysql.connector.Error as e:

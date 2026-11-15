@@ -42,12 +42,8 @@ class Admin:
         self.base_dir = Path(__file__).resolve().parent
         load_dotenv(self.base_dir / ".env")
 
-        self.db_config = {
-            "host": os.getenv("DB_HOST", "localhost"),
-            "user": os.getenv("DB_USER", "root"),
-            "password": os.getenv("DB_PASSWORD", ""),
-            "database": os.getenv("DB_NAME", "student")
-        }
+        from approval_service import get_db_config
+        self.db_config = get_db_config()
 
         # GMAIL CONFIGURATION
         self.admin_email = os.getenv(

@@ -996,14 +996,8 @@ class Face_Recognition:
         student_data = {}
 
         try:
-
-            conn = mysql.connector.connect(
-                host="localhost",
-                user="root",
-                password="Omkar@7518",
-                database="student"
-            )
-
+            from approval_service import get_db_connection
+            conn = get_db_connection()
             cursor = conn.cursor()
 
             cursor.execute("""

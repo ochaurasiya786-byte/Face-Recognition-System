@@ -17,13 +17,16 @@ services:
       - key: DB_PASSWORD
         sync: false
       - key: DB_NAME
-        value: student
+        value: defaultdb
       - key: DB_PORT
-        value: 3306
+        value: 28146
+      - key: DB_SSL_MODE
+        value: REQUIRED
       - key: ADMIN_EMAIL
         sync: false
       - key: SMTP_EMAIL
         sync: false
       - key: SMTP_APP_PASSWORD
         sync: false
-
+      - key: BASE_URL
+        sync: false

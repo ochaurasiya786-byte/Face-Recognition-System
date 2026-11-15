@@ -37,6 +37,13 @@ def get_db_config():
     ssl_ca = os.getenv("DB_SSL_CA")
     if ssl_ca and os.path.exists(ssl_ca):
         config["ssl_ca"] = ssl_ca
+        config["ssl_verify_cert"] = True
+    elif (
+        os.getenv("DB_SSL_MODE", "").lower() in ("required", "true", "1")
+        or "aivencloud.com" in config["host"]
+    ):
+        config["ssl_disabled"] = False
+        config["ssl_verify_cert"] = False
 
     return config
 
