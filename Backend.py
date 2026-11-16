@@ -723,7 +723,8 @@ def api_mark_face_attendance():
             img_fast = img
 
         gray = cv2.cvtColor(img_fast, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(40, 40))
+        # Optimized Haar parameters for fast 1-2 meters detection range
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=4, minSize=(30, 30))
 
         if len(faces) == 0:
             return jsonify({
@@ -751,11 +752,11 @@ def api_mark_face_attendance():
 
         # 2. Predict identity using trained LBPH model
         predicted_id, distance = clf.predict(face_roi)
-        confidence = max(0, min(100, int(100 * (1.0 - distance / 55.0))))
+        confidence = max(0, min(100, int(100 * (1.0 - distance / 85.0))))
 
-        # 3. STRICT BIOMETRIC ACCURACY THRESHOLD
-        STRICT_THRESHOLD = 48.0
-        if distance > STRICT_THRESHOLD or confidence < 30:
+        # 3. BIOMETRIC ACCURACY THRESHOLD (Set to 65.0 for reliable 1-2m range detection)
+        STRICT_THRESHOLD = 65.0
+        if distance > STRICT_THRESHOLD:
             return jsonify({
                 "success": False,
                 "biometric_failure": True,

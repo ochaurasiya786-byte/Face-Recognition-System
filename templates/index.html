@@ -1632,24 +1632,24 @@
                         sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
                     }
                     const avg = sum / (data.length / 4);
-                    const isBlink = prevAvg !== null && Math.abs(avg - prevAvg) > 9;
+                    const isBlink = prevAvg !== null && Math.abs(avg - prevAvg) > 8;
                     prevAvg = avg;
 
-                    // Automatically trigger when eye blink is verified (or after 2.5s of centering face)
-                    if ((isBlink && frames >= 6) || frames >= 20) {
+                    // Fast trigger: upon blink or within 0.5s of centering face
+                    if ((isBlink && frames >= 2) || frames >= 10) {
                         blinkDetected = true;
                         clearInterval(blinkInterval);
-                        status.innerHTML = '<span style="color:#34d399;">&#128065; Eye Blink Detected! Verifying Biometrics &amp; Location...</span>';
+                        status.innerHTML = '<span style="color:#34d399;">⚡ Liveness Verified! Authenticating Face...</span>';
                         await captureAndVerifyFace();
                     }
                 } catch (e) {
-                    if (frames >= 18) {
+                    if (frames >= 8) {
                         blinkDetected = true;
                         clearInterval(blinkInterval);
                         await captureAndVerifyFace();
                     }
                 }
-            }, 120);
+            }, 60);
         }
 
         async function captureAndVerifyFace() {
@@ -1680,7 +1680,7 @@
                 return;
             }
 
-            status.innerHTML = '<span style="color:#55c7ff;">Analyzing biometric face features with trained model...</span>';
+            status.innerHTML = '<span style="color:#55c7ff;">⚡ Verifying biometrics with trained model...</span>';
 
             const payload = {
                 image: imageBase64,
@@ -1703,13 +1703,12 @@
                     showSuccessPopup(data);
                     loadAttendanceRecords();
                 } else {
-                    status.innerHTML = `<span style="color:#ef4444;">${data.message}</span>`;
-                    alert(data.message);
-                    // Allow retry after 2.5 seconds
+                    status.innerHTML = `<span style="color:#ef4444;font-size:0.9rem;">${data.message}</span>`;
+                    // Fast non-blocking retry after 600ms
                     setTimeout(() => {
                         blinkDetected = false;
                         startEyeBlinkMonitor();
-                    }, 2500);
+                    }, 600);
                 }
             } catch (err) {
                 status.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;

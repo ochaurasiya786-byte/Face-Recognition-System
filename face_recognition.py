@@ -1156,9 +1156,9 @@ class Face_Recognition:
             features = (
                 face_cascade.detectMultiScale(
                     gray_image,
-                    scaleFactor=1.1,
-                    minNeighbors=5,
-                    minSize=(100, 100)
+                    scaleFactor=1.15,
+                    minNeighbors=4,
+                    minSize=(40, 40)
                 )
             )
 
@@ -1184,8 +1184,8 @@ class Face_Recognition:
 
                     continue
 
-                # STRICT BIOMETRIC ACCURACY & ANTI-SPOOFING
-                STRICT_DISTANCE_THRESHOLD = 45.0
+                # BIOMETRIC ACCURACY THRESHOLD & ANTI-SPOOFING (Threshold set to 65.0 for reliable 1-2m recognition)
+                STRICT_DISTANCE_THRESHOLD = 65.0
 
                 face_roi = gray_image[y:y+h, x:x+w]
                 lap_var = cv2.Laplacian(face_roi, cv2.CV_64F).var()
@@ -1198,8 +1198,8 @@ class Face_Recognition:
                     and is_live_texture
                 )
 
-                # Realistic Confidence % (100% at dist=0, down to 0% at dist >= 55)
-                confidence = max(0, min(100, int(100 * (1.0 - distance / 55.0))))
+                # Realistic Confidence % (100% at dist=0, down to 0% at dist >= 85)
+                confidence = max(0, min(100, int(100 * (1.0 - distance / 85.0))))
 
                 # RECOGNIZED FACE (STRICT)
                 if is_strictly_recognized:
@@ -1410,12 +1410,11 @@ class Face_Recognition:
                             2
                         )
 
-                    # 15 FRAMES + BLINK
-
+                    # FAST RECOGNITION (4 frames) + BLINK
                     if (
                         not attendance_processed
                         and
-                        recognized_frames >= 15
+                        recognized_frames >= 4
                         and
                         blink_verified
                     ):
@@ -1508,7 +1507,7 @@ class Face_Recognition:
                         )
 
                         cv2.waitKey(
-                            2000
+                            100
                         )
 
                         break
