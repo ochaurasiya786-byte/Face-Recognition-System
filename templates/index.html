@@ -234,22 +234,89 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
         }
 
+        /* Equal image heights for both rows */
         .row2-card .card-img-wrap {
-            height: 105px;
+            height: 145px;
         }
 
         .card-img-wrap img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            object-position: center center;
             display: block;
             transition: transform 0.25s ease;
         }
 
         .dash-card:hover .card-img-wrap img {
             transform: scale(1.04);
+        }
+
+        /* Card 1: Student Details */
+        .img-student {
+            object-fit: cover;
+            object-position: center center;
+        }
+
+        /* Card 2: Face Recognition */
+        .img-face {
+            object-fit: cover;
+            object-position: center center;
+        }
+
+        /* Card 3: Attendance */
+        .img-attendance {
+            object-fit: cover;
+            object-position: center center;
+        }
+
+        /* Card 4: AI Help Desk - contain to show complete avatar and all 4 icons */
+        .card-help .card-img-wrap {
+            background-color: #0c1a2f;
+        }
+        .img-help {
+            object-fit: contain !important;
+            object-position: center center !important;
+            padding: 4px;
+            box-sizing: border-box;
+        }
+
+        /* Card 5: Photos - grid of faces with camera icon */
+        .img-photos {
+            object-fit: cover;
+            object-position: center center;
+        }
+
+        /* Card 6: Developer11 - woman developer with glasses at monitor */
+        .card-developer .card-img-wrap {
+            background-color: #0c1a2f;
+        }
+        .img-developer {
+            object-fit: cover !important;
+            object-position: center 25% !important;
+        }
+
+        /* Card 7: Admin Panel - display complete bottom 'Admin Panel' gear banner */
+        .card-admin .card-img-wrap {
+            background-color: #0c1a2f;
+        }
+        .img-admin {
+            object-fit: cover !important;
+            object-position: center bottom !important;
+        }
+
+        /* Card 8: Exit - blue circular button on white background */
+        .card-exit .card-img-wrap {
+            background-color: #ffffff !important;
+        }
+        .img-exit {
+            object-fit: contain !important;
+            object-position: center center !important;
+            padding: 6px;
+            box-sizing: border-box;
         }
 
         .card-btn {
@@ -584,7 +651,7 @@
             }
 
             .cards-grid-row2 {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(2, 1fr);
             }
 
             .main-heading {
@@ -692,33 +759,33 @@
             <!-- ROW 1 CARDS (4 Cards) -->
             <div class="cards-grid-row1">
                 <!-- 1. Student Details -->
-                <div class="dash-card" onclick="openModal('modalStudent')">
+                <div class="dash-card card-students" onclick="openModal('modalStudent')">
                     <div class="card-img-wrap">
-                        <img src="/college_images/11.png" alt="Student Details">
+                        <img src="/college_images/11.png" alt="Student Details" class="img-student">
                     </div>
                     <div class="card-btn">Student Details</div>
                 </div>
 
                 <!-- 2. Face Recognition -->
-                <div class="dash-card" onclick="startAttendanceFlow()">
+                <div class="dash-card card-face" onclick="startAttendanceFlow()">
                     <div class="card-img-wrap">
-                        <img src="/college_images/2.png" alt="Face Recognition">
+                        <img src="/college_images/2.png" alt="Face Recognition" class="img-face">
                     </div>
                     <div class="card-btn">Face Recognition</div>
                 </div>
 
                 <!-- 3. Attendance -->
-                <div class="dash-card" onclick="openModal('modalAttendance')">
+                <div class="dash-card card-attendance" onclick="openModal('modalAttendance')">
                     <div class="card-img-wrap">
-                        <img src="/college_images/333.png" alt="Attendance">
+                        <img src="/college_images/333.png" alt="Attendance" class="img-attendance">
                     </div>
                     <div class="card-btn">Attendance</div>
                 </div>
 
                 <!-- 4. AI Help Desk -->
-                <div class="dash-card" onclick="openModal('modalHelp')">
+                <div class="dash-card card-help" onclick="openModal('modalHelp')">
                     <div class="card-img-wrap">
-                        <img src="/college_images/4.png" alt="AI Help Desk">
+                        <img src="/college_images/4.png" alt="AI Help Desk" class="img-help">
                     </div>
                     <div class="card-btn">AI Help Desk</div>
                 </div>
@@ -727,33 +794,33 @@
             <!-- ROW 2 CARDS (4 Cards) -->
             <div class="cards-grid-row2">
                 <!-- 5. Photos -->
-                <div class="dash-card row2-card" onclick="openModal('modalPhotos')">
+                <div class="dash-card row2-card card-photos" onclick="openModal('modalPhotos')">
                     <div class="card-img-wrap">
-                        <img src="/college_images/6.png" alt="Photos">
+                        <img src="/college_images/6.png" alt="Photos" class="img-photos">
                     </div>
                     <div class="card-btn">Photos</div>
                 </div>
 
                 <!-- 6. Developer11 -->
-                <div class="dash-card row2-card" onclick="openModal('modalDev')">
+                <div class="dash-card row2-card card-developer" onclick="openModal('modalDev')">
                     <div class="card-img-wrap">
-                        <img src="/college_images/Devloper11.png" alt="Developer11">
+                        <img src="/college_images/Devloper11.png" alt="Developer11" class="img-developer">
                     </div>
                     <div class="card-btn">Developer11</div>
                 </div>
 
                 <!-- 7. Admin Panel -->
-                <div class="dash-card row2-card" onclick="openModal('modalAdmin')">
+                <div class="dash-card row2-card card-admin" onclick="openModal('modalAdmin')">
                     <div class="card-img-wrap">
-                        <img src="/college_images/panel.png" alt="Admin Panel">
+                        <img src="/college_images/panel.png" alt="Admin Panel" class="img-admin">
                     </div>
                     <div class="card-btn">Admin Panel</div>
                 </div>
 
                 <!-- 8. Exit -->
-                <div class="dash-card row2-card" onclick="openModal('modalExit')">
+                <div class="dash-card row2-card card-exit" onclick="openModal('modalExit')">
                     <div class="card-img-wrap">
-                        <img src="/college_images/8.png" alt="Exit">
+                        <img src="/college_images/8.png" alt="Exit" class="img-exit">
                     </div>
                     <div class="card-btn">Exit</div>
                 </div>
