@@ -428,41 +428,54 @@ class Admin:
             )
             return
 
+        import hashlib
         try:
 
             self.my_cursor.execute(
                 """
-                SELECT Admin_ID
+                SELECT Admin_ID, Password
                 FROM admin
                 WHERE Username=%s
-                AND Password=%s
+                LIMIT 1
                 """,
-                (username, password)
+                (username,)
             )
 
             admin = self.my_cursor.fetchone()
 
             if admin:
+                admin_id, stored_pass = admin[0], admin[1]
+                entered_hash = hashlib.sha256(password.encode()).hexdigest()
 
-                self.login_frame.destroy()
-                self.approval_panel()
+                if stored_pass == password or stored_pass == entered_hash:
+                    # Upgrade to SHA-256 hash if stored as plain text
+                    if len(stored_pass) != 64:
+                        try:
+                            self.my_cursor.execute(
+                                "UPDATE admin SET Password=%s WHERE Admin_ID=%s",
+                                (entered_hash, admin_id)
+                            )
+                            self.conn.commit()
+                        except Exception as up_err:
+                            print("Password hash migration notice:", up_err)
 
-                if self.login_success_callback:
+                    self.login_frame.destroy()
+                    self.approval_panel()
 
-                    try:
-                        self.login_success_callback()
-                    except Exception as e:
-                        print("Login callback error:", e)
+                    if self.login_success_callback:
+                        try:
+                            self.login_success_callback()
+                        except Exception as e:
+                            print("Login callback error:", e)
+                    return
 
-            else:
+            messagebox.showerror(
+                "Authentication Failed",
+                "❌ Access Denied: Invalid Admin Username or Password.",
+                parent=self.root
+            )
 
-                messagebox.showerror(
-                    "Login Failed",
-                    "Invalid Admin Username or Password.",
-                    parent=self.root
-                )
-
-                self.password_entry.delete(0, END)
+            self.password_entry.delete(0, END)
 
         except mysql.connector.Error as e:
 

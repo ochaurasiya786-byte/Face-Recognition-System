@@ -24,6 +24,9 @@ class Face_Recognition_System:
         self.root.title("Face Recognition System")
         self.root.resizable(False, False)
 
+        # Handle window close button (X)
+        self.root.protocol("WM_DELETE_WINDOW", self.exit_system)
+
         # IMAGE DIRECTORY
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -910,12 +913,17 @@ class Face_Recognition_System:
     def exit_system(self):
 
         answer = messagebox.askyesno(
-            "Exit Application",
-            "Are you sure you want to completely exit the application?",
+            "Exit",
+            "Are you sure you want to exit?",
             parent=self.root
         )
 
         if answer:
+            try:
+                import cv2
+                cv2.destroyAllWindows()
+            except Exception:
+                pass
             try:
                 self.root.destroy()
             except Exception:

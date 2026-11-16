@@ -280,7 +280,10 @@
     async function executeAction(requestId, action) {
         const actionContainer = document.getElementById(`actions-${requestId}`);
         const row = document.getElementById(`row-${requestId}`);
-        actionContainer.innerHTML = '<span style="font-size:0.85rem;color:var(--text-muted);">Processing...</span>';
+        if (actionContainer) {
+            actionContainer.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            actionContainer.innerHTML = '<span style="font-size:0.85rem;color:var(--text-muted);">Processing...</span>';
+        }
 
         try {
             const res = await fetch(`/api/admin-action/${requestId}/${action}`, {

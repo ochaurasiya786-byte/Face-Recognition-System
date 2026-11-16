@@ -43,8 +43,25 @@ class Login_Register:
         self.root.title("Face Recognition Attendance System - Login")
         self.root.resizable(False, False)
         self.root.configure(bg="#071426")
+        self.root.protocol("WM_DELETE_WINDOW", self.exit_application)
         create_database()
         self.start_app()
+
+    def exit_application(self):
+        answer = messagebox.askyesno("Exit", "Are you sure you want to exit?", parent=self.root)
+        if answer:
+            try:
+                import cv2
+                cv2.destroyAllWindows()
+            except Exception:
+                pass
+            try:
+                self.root.destroy()
+            except Exception:
+                pass
+            import sys, os
+            sys.exit(0)
+            os._exit(0)
 
     # WINDOW CLEAR
     def clear_window(self):

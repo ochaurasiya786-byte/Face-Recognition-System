@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -303,14 +304,21 @@
             max-width: 820px;
             max-height: 90vh;
             overflow-y: auto;
-            box-shadow: 0 20px 45px rgba(0,0,0,0.8), 0 0 25px rgba(85, 199, 255, 0.35);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), 0 0 25px rgba(85, 199, 255, 0.35);
             animation: modalFadeIn 0.2s ease-out;
             color: #ffffff;
         }
 
         @keyframes modalFadeIn {
-            from { transform: scale(0.95); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         .modal-header {
@@ -376,7 +384,9 @@
             font-weight: 600;
         }
 
-        .modal-box input, .modal-box select, .modal-box textarea {
+        .modal-box input,
+        .modal-box select,
+        .modal-box textarea {
             background: #071426;
             border: 1px solid #31577f;
             color: #ffffff;
@@ -385,7 +395,9 @@
             font-size: 0.9rem;
         }
 
-        .modal-box input:focus, .modal-box select:focus, .modal-box textarea:focus {
+        .modal-box input:focus,
+        .modal-box select:focus,
+        .modal-box textarea:focus {
             outline: none;
             border-color: #55c7ff;
             box-shadow: 0 0 8px rgba(85, 199, 255, 0.3);
@@ -458,8 +470,13 @@
         }
 
         @keyframes scanMove {
-            0% { top: 10%; }
-            100% { top: 90%; }
+            0% {
+                top: 10%;
+            }
+
+            100% {
+                top: 90%;
+            }
         }
 
         /* Chat window */
@@ -534,23 +551,58 @@
 
         /* Responsive Styles */
         @media (max-width: 992px) {
-            .cards-grid-row1 { grid-template-columns: repeat(2, 1fr); }
-            .cards-grid-row2 { grid-template-columns: repeat(3, 1fr); }
-            .main-heading { font-size: 1.4rem; }
+            .cards-grid-row1 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .cards-grid-row2 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .main-heading {
+                font-size: 1.4rem;
+            }
         }
 
         @media (max-width: 640px) {
-            .top-banners { height: 90px; }
-            .banner-img-box { height: 90px; }
-            .cards-grid-row1, .cards-grid-row2 { grid-template-columns: 1fr; }
-            .main-heading { font-size: 1.15rem; }
-            .title-banner { flex-direction: column; align-items: flex-start; }
-            .clock-box { padding-left: 0; font-size: 1.25rem; }
-            .form-grid { grid-template-columns: 1fr; }
-            .form-group.full { grid-column: span 1; }
+            .top-banners {
+                height: 90px;
+            }
+
+            .banner-img-box {
+                height: 90px;
+            }
+
+            .cards-grid-row1,
+            .cards-grid-row2 {
+                grid-template-columns: 1fr;
+            }
+
+            .main-heading {
+                font-size: 1.15rem;
+            }
+
+            .title-banner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .clock-box {
+                padding-left: 0;
+                font-size: 1.25rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-group.full {
+                grid-column: span 1;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <!-- TOP 3 IMAGES BANNER -->
@@ -570,7 +622,8 @@
     <div class="title-banner">
         <div class="title-content">
             <div class="main-heading">AI-BASED FACE RECOGNITION ATTENDANCE SYSTEM</div>
-            <div class="sub-heading">Smart Attendance Management System &bull; Student Information &bull; Attendance &bull; Records Management</div>
+            <div class="sub-heading">Smart Attendance Management System &bull; Student Information &bull; Attendance
+                &bull; Records Management</div>
         </div>
         <div class="clock-box" id="liveClock">12:00:00 PM</div>
     </div>
@@ -684,10 +737,14 @@
                 <button class="modal-close-btn" onclick="closeModal('modalStudent')">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #18385f;padding-bottom:10px;flex-wrap:wrap;">
-                    <button id="tabBtnRegister" onclick="showStudentTab('register')" class="btn-action" style="padding:8px 16px;">Enroll New Student</button>
-                    <button id="tabBtnCapture" onclick="showStudentTab('capture')" class="btn-action" style="background:#0d274c;padding:8px 16px;">&#128248; Add New Face</button>
-                    <button id="tabBtnDirectory" onclick="showStudentTab('directory')" class="btn-action" style="background:#0d274c;padding:8px 16px;">View Enrolled Students</button>
+                <div
+                    style="display:flex;gap:10px;margin-bottom:20px;border-bottom:1px solid #18385f;padding-bottom:10px;flex-wrap:wrap;">
+                    <button id="tabBtnRegister" onclick="showStudentTab('register')" class="btn-action"
+                        style="padding:8px 16px;">Enroll New Student</button>
+                    <button id="tabBtnCapture" onclick="showStudentTab('capture')" class="btn-action"
+                        style="background:#0d274c;padding:8px 16px;">&#128248; Add New Face</button>
+                    <button id="tabBtnDirectory" onclick="showStudentTab('directory')" class="btn-action"
+                        style="background:#0d274c;padding:8px 16px;">View Enrolled Students</button>
                 </div>
 
                 <!-- Registration Form View -->
@@ -786,7 +843,9 @@
 
                 <!-- Directory View -->
                 <div id="studentDirectoryView" style="display:none;">
-                    <input type="text" id="searchStudentInput" onkeyup="filterStudentsTable()" placeholder="Type to search student by name, ID or department..." style="width:100%;margin-bottom:14px;">
+                    <input type="text" id="searchStudentInput" onkeyup="filterStudentsTable()"
+                        placeholder="Type to search student by name, ID or department..."
+                        style="width:100%;margin-bottom:14px;">
                     <div style="overflow-x:auto;max-height:360px;">
                         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
                             <thead>
@@ -800,7 +859,10 @@
                                 </tr>
                             </thead>
                             <tbody id="studentTableBody">
-                                <tr><td colspan="6" style="padding:20px;text-align:center;color:#9db4cf;">Loading students...</td></tr>
+                                <tr>
+                                    <td colspan="6" style="padding:20px;text-align:center;color:#9db4cf;">Loading
+                                        students...</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -812,11 +874,13 @@
                         Capture new student face samples directly into the training dataset.
                     </p>
                     <div style="max-width:320px;margin:0 auto 14px;text-align:left;">
-                        <label style="font-size:0.85rem;color:#9db4cf;display:block;margin-bottom:4px;">Student ID *</label>
+                        <label style="font-size:0.85rem;color:#9db4cf;display:block;margin-bottom:4px;">Student ID
+                            *</label>
                         <input type="text" id="capStudentId" placeholder="e.g. 213, 987" style="width:100%;">
                     </div>
                     <div class="scanner-container" style="max-width:380px;height:240px;margin-bottom:12px;">
-                        <video id="captureVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+                        <video id="captureVideo" autoplay playsinline muted
+                            style="width:100%;height:100%;object-fit:cover;"></video>
                         <canvas id="captureCanvas" style="display:none;"></canvas>
                     </div>
                     <div id="captureStatus" style="font-size:0.9rem;color:#55c7ff;font-weight:700;margin-bottom:14px;">
@@ -824,8 +888,10 @@
                     </div>
                     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;">
                         <button class="btn-action" onclick="startCaptureCamera()">&#128247; Start Camera</button>
-                        <button class="btn-action" style="background:#10b981;" onclick="takeSampleBatch()">&#128248; Capture 5 Samples</button>
-                        <button class="btn-action" style="background:#dc2626;" onclick="stopCaptureCamera()">Stop Camera</button>
+                        <button class="btn-action" style="background:#10b981;" onclick="takeSampleBatch()">&#128248;
+                            Capture 5 Samples</button>
+                        <button class="btn-action" style="background:#dc2626;" onclick="stopCaptureCamera()">Stop
+                            Camera</button>
                     </div>
                     <button class="btn-action" style="background:#0d274c;width:100%;" onclick="openModal('modalTrain')">
                         &rarr; Go to Train Data to Retrain Model
@@ -864,13 +930,17 @@
                 </div>
 
                 <div style="margin-bottom:14px;max-width:320px;margin-left:auto;margin-right:auto;">
-                    <label style="font-size:0.8rem;color:#9db4cf;display:block;margin-bottom:4px;">Enrolled Student ID (Optional - Auto-Identifies Face):</label>
-                    <input type="text" id="scanStudentId" value="" placeholder="Auto-detect face or enter ID" style="text-align:center;font-weight:700;width:100%;">
+                    <label style="font-size:0.8rem;color:#9db4cf;display:block;margin-bottom:4px;">Enrolled Student ID
+                        (Optional - Auto-Identifies Face):</label>
+                    <input type="text" id="scanStudentId" value="" placeholder="Auto-detect face or enter ID"
+                        style="text-align:center;font-weight:700;width:100%;">
                 </div>
 
                 <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-                    <a href="/mobile" target="_blank" class="btn-action" style="background:#0d274c;text-decoration:none;">&#128205; Mobile GPS Check-In</a>
-                    <button class="btn-action" style="background:#dc2626;" onclick="stopCamera(); closeModal('modalScan')">Cancel</button>
+                    <a href="/mobile" target="_blank" class="btn-action"
+                        style="background:#0d274c;text-decoration:none;">&#128205; Mobile GPS Check-In</a>
+                    <button class="btn-action" style="background:#dc2626;"
+                        onclick="stopCamera(); closeModal('modalScan')">Cancel</button>
                 </div>
             </div>
         </div>
@@ -881,12 +951,15 @@
     <!-- MODAL: ATTENDANCE SUCCESS POPUP -->
     <!-- ========================================== -->
     <div id="modalSuccessPopup" class="modal-overlay" style="display:none;z-index:9999;">
-        <div class="modal-box" style="max-width:480px;text-align:center;border-color:#10b981;box-shadow:0 0 35px rgba(16,185,129,0.5);">
+        <div class="modal-box"
+            style="max-width:480px;text-align:center;border-color:#10b981;box-shadow:0 0 35px rgba(16,185,129,0.5);">
             <div style="font-size:3.5rem;margin:12px 0 4px;">&#127881;</div>
             <h3 style="color:#10b981;font-size:1.5rem;margin-bottom:6px;">Attendance Marked Successfully!</h3>
-            <p style="color:#9db4cf;font-size:0.88rem;margin-bottom:18px;">Face biometrics, eye blink and location verified on campus.</p>
+            <p style="color:#9db4cf;font-size:0.88rem;margin-bottom:18px;">Face biometrics, eye blink and location
+                verified on campus.</p>
 
-            <div style="background:#071426;border:1px solid #18385f;border-radius:8px;padding:16px;text-align:left;font-size:0.9rem;margin-bottom:20px;">
+            <div
+                style="background:#071426;border:1px solid #18385f;border-radius:8px;padding:16px;text-align:left;font-size:0.9rem;margin-bottom:20px;">
                 <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #18385f;">
                     <span style="color:#9db4cf;">Student Name:</span>
                     <strong id="popName" style="color:#ffffff;">Omkar Chaurasiya</strong>
@@ -913,13 +986,14 @@
                 </div>
             </div>
 
-            <button class="btn-action" style="background:#10b981;width:100%;font-size:1rem;padding:12px;" onclick="closeSuccessPopup()">
+            <button class="btn-action" style="background:#10b981;width:100%;font-size:1rem;padding:12px;"
+                onclick="closeSuccessPopup()">
                 &#10004; Done / Continue
             </button>
         </div>
     </div>
-            </div>
-        </div>
+    </div>
+    </div>
     </div>
 
 
@@ -933,9 +1007,13 @@
                 <button class="modal-close-btn" onclick="closeModal('modalAttendance')">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-                    <input type="text" id="searchAttendInput" onkeyup="filterAttendanceTable()" placeholder="Search by student name or ID..." style="flex:1;min-width:240px;">
-                    <a href="/mobile" target="_blank" class="btn-action" style="padding:8px 16px;text-decoration:none;font-size:0.85rem;">Launch Mobile GPS Attendance</a>
+                <div
+                    style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                    <input type="text" id="searchAttendInput" onkeyup="filterAttendanceTable()"
+                        placeholder="Search by student name or ID..." style="flex:1;min-width:240px;">
+                    <a href="/mobile" target="_blank" class="btn-action"
+                        style="padding:8px 16px;text-decoration:none;font-size:0.85rem;">Launch Mobile GPS
+                        Attendance</a>
                 </div>
                 <div style="overflow-x:auto;max-height:400px;">
                     <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
@@ -951,7 +1029,10 @@
                             </tr>
                         </thead>
                         <tbody id="attendanceTableBody">
-                            <tr><td colspan="7" style="padding:20px;text-align:center;color:#9db4cf;">Loading attendance records...</td></tr>
+                            <tr>
+                                <td colspan="7" style="padding:20px;text-align:center;color:#9db4cf;">Loading attendance
+                                    records...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -972,19 +1053,29 @@
             <div class="modal-body">
                 <div class="chat-box" id="chatMessages">
                     <div class="chat-bubble bubble-bot">
-                        Hello! I am your AI Attendance Assistant. Ask me anything about marking attendance, allowed campus radius, student registration, or developer details!
+                        Hello! I am your AI Attendance Assistant. Ask me anything about marking attendance, allowed
+                        campus radius, student registration, or developer details!
                     </div>
                 </div>
 
                 <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-                    <button onclick="askPreset('How do I mark attendance?')" style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">How to attend?</button>
-                    <button onclick="askPreset('What are the allowed timings?')" style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Allowed timings?</button>
-                    <button onclick="askPreset('How can a student register?')" style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Registration steps?</button>
-                    <button onclick="askPreset('Who is the developer?')" style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Developer info?</button>
+                    <button onclick="askPreset('How do I mark attendance?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">How
+                        to attend?</button>
+                    <button onclick="askPreset('What are the allowed timings?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Allowed
+                        timings?</button>
+                    <button onclick="askPreset('How can a student register?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Registration
+                        steps?</button>
+                    <button onclick="askPreset('Who is the developer?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Developer
+                        info?</button>
                 </div>
 
                 <div class="chat-input-row">
-                    <input type="text" id="chatInput" placeholder="Type your question..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+                    <input type="text" id="chatInput" placeholder="Type your question..."
+                        onkeypress="if(event.key==='Enter') sendChatMessage()">
                     <button class="btn-action" onclick="sendChatMessage()">Send</button>
                 </div>
             </div>
@@ -1005,7 +1096,8 @@
                 <p style="color:#9db4cf;font-size:0.9rem;margin-bottom:16px;">
                     Preview of biometric student face samples stored in dataset:
                 </p>
-                <div id="photosGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;max-height:420px;overflow-y:auto;">
+                <div id="photosGrid"
+                    style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:10px;max-height:420px;overflow-y:auto;">
                     <!-- Filled by JavaScript -->
                 </div>
             </div>
@@ -1018,20 +1110,25 @@
     <!-- ========================================== -->
     <div id="modalDev" class="modal-overlay" onclick="closeOnOutside(event, 'modalDev')">
         <div class="modal-box" style="max-width:680px;background:#ffffff;color:#111827;border-color:#056b1d;">
-            <div style="background:#ffffff;padding:16px 20px;border-bottom:2px solid #056b1d;display:flex;justify-content:space-between;align-items:center;">
-                <h2 style="font-family:'Times New Roman',serif;font-size:2rem;font-weight:700;color:#056b1d;margin:0;">Developer</h2>
+            <div
+                style="background:#ffffff;padding:16px 20px;border-bottom:2px solid #056b1d;display:flex;justify-content:space-between;align-items:center;">
+                <h2 style="font-family:'Times New Roman',serif;font-size:2rem;font-weight:700;color:#056b1d;margin:0;">
+                    Developer</h2>
                 <button class="modal-close-btn" style="color:#374151;" onclick="closeModal('modalDev')">&times;</button>
             </div>
             <div style="padding:22px;">
                 <!-- Header with photo -->
                 <div style="display:flex;gap:20px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
-                    <img src="/college_images/om.png" alt="Omkar Chaurasiya" style="width:140px;height:140px;border-radius:6px;object-fit:cover;border:2px solid #056b1d;">
+                    <img src="/college_images/om.png" alt="Omkar Chaurasiya"
+                        style="width:140px;height:140px;border-radius:6px;object-fit:cover;border:2px solid #056b1d;">
                     <div>
                         <div style="font-size:0.95rem;font-weight:700;color:#111827;">Hello, My name is</div>
-                        <div style="font-size:1.45rem;font-weight:800;color:#056b1d;margin:3px 0;">Omkar Chaurasiya</div>
+                        <div style="font-size:1.45rem;font-weight:800;color:#056b1d;margin:3px 0;">Omkar Chaurasiya
+                        </div>
                         <div style="font-size:1rem;font-weight:700;color:#374151;">Full Stack Developer</div>
                         <div style="font-size:0.95rem;color:#4b5563;">B.Tech &ndash; CSE</div>
-                        <div style="font-size:0.9rem;font-weight:700;color:#056b1d;margin-top:4px;">AI-Based Student Recognition System</div>
+                        <div style="font-size:0.9rem;font-weight:700;color:#056b1d;margin-top:4px;">AI-Based Student
+                            Recognition System</div>
                     </div>
                 </div>
 
@@ -1042,7 +1139,8 @@
                     <div>
                         <h4 style="color:#056b1d;font-size:1.05rem;margin-bottom:8px;">Project Information</h4>
                         <p style="margin-bottom:4px;"><strong>Project:</strong> AI-Based Face Attendance</p>
-                        <p style="margin-bottom:4px;"><strong>Institute:</strong> Khwaja Moinuddin Chishti Language University</p>
+                        <p style="margin-bottom:4px;"><strong>Institute:</strong> Khwaja Moinuddin Chishti Language
+                            University</p>
                         <p style="margin-bottom:4px;"><strong>Location:</strong> Lucknow, Uttar Pradesh</p>
                         <p style="margin-bottom:4px;"><strong>Guide:</strong> Dr. Amlendra Sir</p>
                     </div>
@@ -1050,7 +1148,8 @@
                         <h4 style="color:#056b1d;font-size:1.05rem;margin-bottom:8px;">Technologies Used</h4>
                         <p style="margin-bottom:4px;">Python &bull; Tkinter &bull; OpenCV</p>
                         <p style="margin-bottom:4px;">Flask &bull; MySQL &bull; Render Cloud</p>
-                        <h4 style="color:#056b1d;font-size:1.05rem;margin-top:10px;margin-bottom:6px;">Developer Role</h4>
+                        <h4 style="color:#056b1d;font-size:1.05rem;margin-top:10px;margin-bottom:6px;">Developer Role
+                        </h4>
                         <p style="margin-bottom:3px;">&bull; GUI Development</p>
                         <p style="margin-bottom:3px;">&bull; Database &amp; Cloud Integration</p>
                         <p style="margin-bottom:3px;">&bull; Face Recognition Engine</p>
@@ -1078,26 +1177,36 @@
                 <!-- If not logged in view -->
                 <div id="adminLoginBox" style="max-width:380px;margin:20px auto;text-align:center;">
                     <h4 style="margin-bottom:12px;font-size:1.2rem;">Admin Sign In</h4>
-                    <p style="color:#9db4cf;font-size:0.85rem;margin-bottom:16px;">Strictly authenticate to review and approve student requests.</p>
+                    <p style="color:#9db4cf;font-size:0.85rem;margin-bottom:16px;">Strictly authenticate to review and
+                        approve student requests.</p>
 
-                    <div id="adminLoginError" style="display:none;background:rgba(220,38,38,0.2);border:1px solid #dc2626;color:#fca5a5;padding:10px;border-radius:6px;font-size:0.85rem;margin-bottom:14px;text-align:left;"></div>
+                    <div id="adminLoginError"
+                        style="display:none;background:rgba(220,38,38,0.2);border:1px solid #dc2626;color:#fca5a5;padding:10px;border-radius:6px;font-size:0.85rem;margin-bottom:14px;text-align:left;">
+                    </div>
 
                     <div style="margin-bottom:14px;text-align:left;">
-                        <label style="font-size:0.85rem;color:#9db4cf;display:block;margin-bottom:4px;">Username *</label>
-                        <input type="text" id="adminUser" placeholder="Enter Admin Username" value="" autocomplete="off" style="width:100%;">
+                        <label style="font-size:0.85rem;color:#9db4cf;display:block;margin-bottom:4px;">Username
+                            *</label>
+                        <input type="text" id="adminUser" placeholder="Enter Admin Username" value="" autocomplete="off"
+                            style="width:100%;">
                     </div>
                     <div style="margin-bottom:18px;text-align:left;">
-                        <label style="font-size:0.85rem;color:#9db4cf;display:block;margin-bottom:4px;">Password *</label>
-                        <input type="password" id="adminPass" placeholder="Enter Admin Password" value="" autocomplete="new-password" style="width:100%;" onkeypress="if(event.key==='Enter') adminQuickLogin()">
+                        <label style="font-size:0.85rem;color:#9db4cf;display:block;margin-bottom:4px;">Password
+                            *</label>
+                        <input type="password" id="adminPass" placeholder="Enter Admin Password" value=""
+                            autocomplete="new-password" style="width:100%;"
+                            onkeypress="if(event.key==='Enter') adminQuickLogin()">
                     </div>
-                    <button class="btn-action" style="width:100%;" onclick="adminQuickLogin()">Unlock Admin Panel &rarr;</button>
+                    <button class="btn-action" style="width:100%;" onclick="adminQuickLogin()">Unlock Admin Panel
+                        &rarr;</button>
                 </div>
 
                 <!-- Logged in view -->
                 <div id="adminDashboardBox" style="display:none;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                         <strong style="color:#55c7ff;">Pending Student Requests</strong>
-                        <button class="btn-action" style="background:#dc2626;padding:6px 12px;font-size:0.8rem;" onclick="adminLogout()">Lock Panel</button>
+                        <button class="btn-action" style="background:#dc2626;padding:6px 12px;font-size:0.8rem;"
+                            onclick="adminLogout()">Lock Panel</button>
                     </div>
                     <div style="overflow-x:auto;max-height:380px;">
                         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
@@ -1128,13 +1237,13 @@
         <div class="modal-box" style="max-width:440px;text-align:center;">
             <div class="modal-body" style="padding:32px 24px;">
                 <div style="font-size:3rem;margin-bottom:12px;">&#128682;</div>
-                <h3 style="font-size:1.35rem;margin-bottom:8px;">Exit Application</h3>
-                <p style="color:#9db4cf;font-size:0.95rem;margin-bottom:24px;">
-                    Are you sure you want to completely exit the application and return to your desktop/home screen?
+                <h3 style="font-size:1.35rem;margin-bottom:8px;">Exit Confirmation</h3>
+                <p style="color:#9db4cf;font-size:1rem;margin-bottom:24px;">
+                    Are you sure you want to exit?
                 </p>
                 <div style="display:flex;gap:12px;justify-content:center;">
-                    <button class="btn-action" style="background:#dc2626;" onclick="confirmExitApp()">Confirm Exit</button>
-                    <button class="btn-action" style="background:#0d274c;" onclick="closeModal('modalExit')">Cancel</button>
+                    <button class="btn-action" style="background:#dc2626;padding:10px 28px;" onclick="confirmExitApp()">Yes</button>
+                    <button class="btn-action" style="background:#0d274c;padding:10px 24px;" onclick="closeModal('modalExit')">Cancel</button>
                 </div>
             </div>
         </div>
@@ -1421,10 +1530,10 @@
             const R = 6371000;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return Math.round(R * c);
         }
 
@@ -1521,7 +1630,7 @@
                     const data = ctx.getImageData(40, 25, 80, 50).data;
                     let sum = 0;
                     for (let i = 0; i < data.length; i += 4) {
-                        sum += (data[i] + data[i+1] + data[i+2]) / 3;
+                        sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
                     }
                     const avg = sum / (data.length / 4);
                     const isBlink = prevAvg !== null && Math.abs(avg - prevAvg) > 9;
@@ -1827,14 +1936,23 @@
             }
         }
 
+        let isActionProcessing = false;
         async function executeWebAction(reqId, act) {
+            if (isActionProcessing) return;
             const row = document.getElementById(`req-row-${reqId}`);
             const cell = document.getElementById(`action-cell-${reqId}`);
-            if (cell) cell.innerHTML = '<span style="color:#55c7ff;font-size:0.85rem;">Processing...</span>';
+            if (cell) {
+                // Prevent duplicate actions immediately
+                cell.querySelectorAll('button').forEach(btn => btn.disabled = true);
+                cell.innerHTML = '<span style="color:#55c7ff;font-size:0.85rem;">Processing...</span>';
+            }
+            isActionProcessing = true;
 
             try {
                 const res = await fetch(`/api/admin-action/${reqId}/${act}`, { method: 'POST' });
                 const data = await res.json();
+                isActionProcessing = false;
+
                 if (data.success) {
                     const color = act === 'approve' ? '#34d399' : '#ef4444';
                     const text = act === 'approve' ? 'Approved' : 'Rejected';
@@ -1842,9 +1960,19 @@
                         cell.innerHTML = `<span style="color:${color};font-weight:700;">&#10003; ${text}</span>`;
                     }
 
+                    // Display success notification popup / toast
+                    showActionToast(`✅ Request #${reqId} was ${text.toLowerCase()} successfully! Database updated.`);
+
+                    // Immediately close/disappear any open popup or modal
+                    ['modalDetail', 'modalReqAction'].forEach(mId => {
+                        const m = document.getElementById(mId);
+                        if (m) m.style.display = 'none';
+                    });
+
                     // AUTO-DISAPPEAR: Remove row smoothly after approving/rejecting
                     setTimeout(() => {
                         if (row) {
+                            row.style.transition = 'all 0.3s ease';
                             row.style.opacity = '0';
                             row.style.transform = 'translateX(25px)';
                             setTimeout(() => {
@@ -1853,26 +1981,56 @@
                                 if (tbody && tbody.querySelectorAll('tr').length === 0) {
                                     tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#34d399;">&#10003; No pending requests! All students reviewed.</td></tr>';
                                 }
-                            }, 450);
+                            }, 300);
                         }
-                    }, 500);
+                    }, 400);
+
+                    // Refresh directory if approved
+                    if (act === 'approve') {
+                        loadEnrolledStudents();
+                    }
                 } else {
                     if (cell) cell.innerHTML = `<span style="color:#ef4444;">Failed</span>`;
                     alert(data.message || 'Action error');
                 }
             } catch (err) {
+                isActionProcessing = false;
                 if (cell) cell.innerHTML = `<span style="color:#ef4444;">Error</span>`;
             }
         }
 
+        // Floating Action Notification Toast
+        function showActionToast(msg) {
+            let toast = document.getElementById('actionToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'actionToast';
+                toast.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#10b981;color:#ffffff;padding:12px 20px;border-radius:8px;font-weight:700;font-size:0.92rem;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:99999;transition:all 0.3s ease;opacity:0;transform:translateY(20px);';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(20px)';
+            }, 3000);
+        }
+
         // 9. Clean Application Exit
         function confirmExitApp() {
+            stopCamera();
+            if (blinkInterval) {
+                clearInterval(blinkInterval);
+                blinkInterval = null;
+            }
             try {
                 window.open('', '_self', '');
                 window.close();
-            } catch (e) {}
+            } catch (e) { }
             window.location.href = '/exit';
         }
     </script>
 </body>
+
 </html>

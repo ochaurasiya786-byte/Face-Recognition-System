@@ -1184,21 +1184,24 @@ class Face_Recognition:
 
                     continue
 
-                # STRICT FACE RECOGNITION:
-                # In LBPH, distance measures difference (0 = exact match).
-                # Setting threshold <= 48 eliminates strangers, false positives and loose matches.
-                STRICT_DISTANCE_THRESHOLD = 48.0
+                # STRICT BIOMETRIC ACCURACY & ANTI-SPOOFING
+                STRICT_DISTANCE_THRESHOLD = 45.0
+
+                face_roi = gray_image[y:y+h, x:x+w]
+                lap_var = cv2.Laplacian(face_roi, cv2.CV_64F).var()
+                contrast_std = float(face_roi.std()) if face_roi.size > 0 else 0
+                is_live_texture = (lap_var >= 3.0 and contrast_std >= 18.0)
 
                 is_strictly_recognized = (
                     distance <= STRICT_DISTANCE_THRESHOLD
                     and predicted_id in student_data
+                    and is_live_texture
                 )
 
-                # Realistic Confidence % (100% at dist=0, down to 0% at dist >= 60)
-                confidence = max(0, min(100, int(100 * (1.0 - distance / 60.0))))
+                # Realistic Confidence % (100% at dist=0, down to 0% at dist >= 55)
+                confidence = max(0, min(100, int(100 * (1.0 - distance / 55.0))))
 
                 # RECOGNIZED FACE (STRICT)
-
                 if is_strictly_recognized:
 
                     student_id = int(
@@ -1541,9 +1544,23 @@ class Face_Recognition:
                         3
                     )
 
+                    reason_text = "Anti-Spoof: Screen/Photo Detected" if not is_live_texture else "Face Not Recognized"
                     cv2.putText(
                         img,
-                        f"Unknown Face (Dist: {int(distance)})",
+                        "Authentication Failed",
+                        (
+                            x,
+                            y - 35
+                        ),
+                        cv2.FONT_HERSHEY_COMPLEX,
+                        0.7,
+                        (0, 0, 255),
+                        2
+                    )
+
+                    cv2.putText(
+                        img,
+                        reason_text,
                         (
                             x,
                             y - 10

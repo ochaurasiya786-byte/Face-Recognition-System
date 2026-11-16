@@ -737,28 +737,41 @@ def api_mark_face_attendance():
         (x, y, w, h) = faces[0]
         face_roi = gray[y:y+h, x:x+w]
 
-        # Predict identity using trained LBPH model
-        predicted_id, distance = clf.predict(face_roi)
-        confidence = max(0, min(100, int(100 * (1 - distance / 100))))
+        # 1. Anti-Spoofing & Liveness Texture Check
+        # Photos, printed papers, or blank screens lack natural facial contrast and 3D micro-depth
+        lap_var = cv2.Laplacian(face_roi, cv2.CV_64F).var()
+        contrast_std = float(np.std(face_roi))
+        if lap_var < 3.0 or contrast_std < 18.0:
+            return jsonify({
+                "success": False,
+                "biometric_failure": True,
+                "liveness_failure": True,
+                "message": "❌ Anti-Spoofing Check Failed: Static or blurred screen/photo detected. Please face the live camera in good lighting."
+            }), 403
 
-        # STRICT BIOMETRIC THRESHOLD
-        STRICT_THRESHOLD = 52.0
-        if distance > STRICT_THRESHOLD:
+        # 2. Predict identity using trained LBPH model
+        predicted_id, distance = clf.predict(face_roi)
+        confidence = max(0, min(100, int(100 * (1.0 - distance / 55.0))))
+
+        # 3. STRICT BIOMETRIC ACCURACY THRESHOLD
+        STRICT_THRESHOLD = 48.0
+        if distance > STRICT_THRESHOLD or confidence < 30:
             return jsonify({
                 "success": False,
                 "biometric_failure": True,
                 "distance": round(distance, 1),
-                "message": f"❌ Biometric Verification Failed: Unknown Face! Biometric distance is {round(distance, 1)} (Max allowed: {STRICT_THRESHOLD}). Strangers cannot mark attendance!"
+                "confidence": confidence,
+                "message": f"❌ Authentication Failed: Face Not Recognized. (Match distance: {round(distance, 1)}). Unknown or unauthorized faces cannot mark attendance."
             }), 403
 
-        # IDENTITY MATCH CHECK - PREVENT MARKING SOMEONE ELSE'S ATTENDANCE
+        # 4. IDENTITY FRAUD PREVENTION - PREVENT MARKING ANOTHER PERSON'S ATTENDANCE
         if claimed_student_id and str(claimed_student_id) != str(predicted_id):
             return jsonify({
                 "success": False,
                 "biometric_failure": True,
                 "claimed_id": claimed_student_id,
                 "recognized_id": str(predicted_id),
-                "message": f"❌ Biometric Mismatch! The person in front of the camera is recognized as Student ID {predicted_id}, NOT Student ID {claimed_student_id}. Any person cannot mark another person's attendance!"
+                "message": f"❌ Authentication Failed: Biometric Mismatch! The person in front of the camera is recognized as Student ID {predicted_id}, NOT Student ID {claimed_student_id}. You cannot mark attendance on behalf of another person!"
             }), 403
 
         student_id = str(predicted_id)
@@ -846,27 +859,47 @@ def api_admin_verify():
     if not username or not password:
         return jsonify({
             "success": False,
-            "message": "❌ Strictly required: Admin username and password must both be entered."
+            "message": "❌ Strictly required: Admin username/email and password must both be entered."
         }), 400
 
-    admin_user = os.environ.get("ADMIN_USERNAME", "admin").strip()
-    admin_pass = os.environ.get("ADMIN_PASSWORD", "Admin@123").strip()
-
     authenticated = False
-    if username == admin_user and password == admin_pass:
-        authenticated = True
-    else:
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT password FROM users WHERE username = %s LIMIT 1", (username,))
-            row = cursor.fetchone()
-            if row and row[0] == password:
+    conn = None
+    cursor = None
+    try:
+        import hashlib
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Strictly validate credentials against MySQL admin table
+        cursor.execute(
+            "SELECT Admin_ID, Password FROM admin WHERE Username = %s LIMIT 1",
+            (username,)
+        )
+        row = cursor.fetchone()
+
+        if row:
+            admin_id, stored_pass = row[0], row[1]
+            entered_hash = hashlib.sha256(password.encode()).hexdigest()
+
+            # Verify against stored SHA-256 hash or plain-text password
+            if stored_pass == entered_hash or stored_pass == password:
                 authenticated = True
-            cursor.close()
-            conn.close()
-        except Exception:
-            pass
+                # Automatically upgrade plain-text passwords to SHA-256 hash in database
+                if len(stored_pass) != 64:
+                    try:
+                        cursor.execute(
+                            "UPDATE admin SET Password = %s WHERE Admin_ID = %s",
+                            (entered_hash, admin_id)
+                        )
+                        conn.commit()
+                    except Exception as up_err:
+                        print("Password hash migration notice:", up_err)
+
+    except Exception as e:
+        print("Admin database authentication error:", e)
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
 
     if authenticated:
         session["admin_logged_in"] = True
@@ -877,7 +910,7 @@ def api_admin_verify():
     else:
         return jsonify({
             "success": False,
-            "message": "❌ Invalid admin username or password. Access denied."
+            "message": "❌ Authentication Failed: Invalid admin username or password. Access denied."
         }), 401
 
 @app.route("/exit")
