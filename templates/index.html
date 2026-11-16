@@ -928,11 +928,17 @@
                     Ready to scan face...
                 </div>
 
-                <div style="margin-bottom:14px;max-width:320px;margin-left:auto;margin-right:auto;">
-                    <label style="font-size:0.8rem;color:#9db4cf;display:block;margin-bottom:4px;">Enrolled Student ID
-                        (Optional - Auto-Identifies Face):</label>
-                    <input type="text" id="scanStudentId" value="" placeholder="Auto-detect face or enter ID"
-                        style="text-align:center;font-weight:700;width:100%;">
+                <div style="margin-bottom:14px;max-width:380px;margin-left:auto;margin-right:auto;text-align:left;">
+                    <label for="scanStudentId" style="font-size:0.85rem;color:#55c7ff;display:block;margin-bottom:6px;font-weight:700;">
+                        Enter Registered Student ID <span style="color:#ef4444;">*</span>:
+                    </label>
+                    <input type="text" id="scanStudentId" list="enrolledStudentsList" value="" placeholder="Enter or select Student ID (e.g. 987)" required
+                        style="text-align:center;font-weight:700;width:100%;font-size:1.05rem;padding:10px 14px;border:2px solid #1e40af;border-radius:8px;background:#0d2342;color:#ffffff;box-sizing:border-box;outline:none;"
+                        autocomplete="off">
+                    <datalist id="enrolledStudentsList"></datalist>
+                    <div id="scanIdHelp" style="font-size:0.75rem;color:#94a3b8;margin-top:5px;text-align:center;">
+                        Attendance strictly compares your live webcam face against this registered Student ID.
+                    </div>
                 </div>
 
                 <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
@@ -1480,6 +1486,14 @@
         }
 
         let enrolledCache = [];
+        function populateStudentIdDatalist(students) {
+            const datalist = document.getElementById('enrolledStudentsList');
+            if (!datalist || !students || !students.length) return;
+            datalist.innerHTML = students.map(s => 
+                `<option value="${s.Student_ID}">${s.Student_ID} - ${s.Student_Name} (${s.Dep || 'Student'})</option>`
+            ).join('');
+        }
+
         async function loadEnrolledStudents() {
             const tbody = document.getElementById('studentTableBody');
             try {
@@ -1487,8 +1501,9 @@
                 const data = await res.json();
                 enrolledCache = data.students || [];
                 renderStudentsTable(enrolledCache);
+                populateStudentIdDatalist(enrolledCache);
             } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="6" style="padding:15px;color:#ef4444;text-align:center;">Error: ${err.message}</td></tr>`;
+                if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="padding:15px;color:#ef4444;text-align:center;">Error: ${err.message}</td></tr>`;
             }
         }
 
@@ -1543,8 +1558,22 @@
 
         async function startAttendanceFlow() {
             openModal('modalScan');
+            const stuInput = document.getElementById('scanStudentId');
             const status = document.getElementById('scanStatus');
             status.innerHTML = '<span style="color:#55c7ff;">Checking campus location &amp; opening camera...</span>';
+
+            // Ensure enrolled students datalist is populated for quick Student ID selection
+            if (!enrolledCache || enrolledCache.length === 0) {
+                loadEnrolledStudents();
+            } else {
+                populateStudentIdDatalist(enrolledCache);
+            }
+
+            if (stuInput) {
+                stuInput.value = '';
+                stuInput.style.borderColor = '#1e40af';
+                setTimeout(() => stuInput.focus(), 250);
+            }
 
             // Directly launch camera - NO clicks needed!
             await startCamera();
@@ -1566,13 +1595,13 @@
                             closeModal('modalScan');
                             return;
                         } else {
-                            status.innerHTML = `<span style="color:#10b981;">&#128205; Location Verified (${dist}m) &bull; Please BLINK your eyes to mark attendance!</span>`;
+                            status.innerHTML = `<span style="color:#10b981;">&#128205; Location Verified (${dist}m) &bull; Enter/select Student ID &amp; BLINK eyes!</span>`;
                         }
                     },
                     (err) => {
                         console.warn('Geolocation unavailable:', err.message);
                         userLocation = { latitude: COLLEGE_LAT, longitude: COLLEGE_LON, distance: 50 };
-                        status.innerHTML = '<span style="color:#10b981;">&#9679; Camera Active &bull; Please BLINK your eyes to mark attendance!</span>';
+                        status.innerHTML = '<span style="color:#10b981;">&#9679; Camera Active &bull; Enter Student ID &amp; BLINK eyes to mark attendance!</span>';
                     },
                     { enableHighAccuracy: true, timeout: 5000 }
                 );
@@ -1637,13 +1666,33 @@
 
                     // Fast trigger: upon blink or within 0.5s of centering face
                     if ((isBlink && frames >= 2) || frames >= 10) {
+                        const stuInput = document.getElementById('scanStudentId');
+                        const sid = stuInput ? stuInput.value.trim() : '';
+                        if (!sid) {
+                            status.innerHTML = '<span style="color:#f59e0b;font-weight:700;">⚠️ Please enter or select your registered Student ID first to mark attendance.</span>';
+                            if (stuInput) {
+                                stuInput.style.borderColor = '#ef4444';
+                                stuInput.focus();
+                            }
+                            return;
+                        }
                         blinkDetected = true;
                         clearInterval(blinkInterval);
-                        status.innerHTML = '<span style="color:#34d399;">⚡ Liveness Verified! Authenticating Face...</span>';
+                        status.innerHTML = '<span style="color:#34d399;">⚡ Liveness Verified! Verifying Student ID &amp; Face...</span>';
                         await captureAndVerifyFace();
                     }
                 } catch (e) {
                     if (frames >= 8) {
+                        const stuInput = document.getElementById('scanStudentId');
+                        const sid = stuInput ? stuInput.value.trim() : '';
+                        if (!sid) {
+                            status.innerHTML = '<span style="color:#f59e0b;font-weight:700;">⚠️ Please enter or select your registered Student ID first to mark attendance.</span>';
+                            if (stuInput) {
+                                stuInput.style.borderColor = '#ef4444';
+                                stuInput.focus();
+                            }
+                            return;
+                        }
                         blinkDetected = true;
                         clearInterval(blinkInterval);
                         await captureAndVerifyFace();
@@ -1654,9 +1703,28 @@
 
         async function captureAndVerifyFace() {
             const stuInput = document.getElementById('scanStudentId');
-            const studentId = stuInput ? stuInput.value.trim() : '';
+            let studentId = stuInput ? stuInput.value.trim() : '';
+            if (studentId.includes(' - ')) {
+                studentId = studentId.split(' - ')[0].trim();
+            } else if (studentId.includes(' ')) {
+                studentId = studentId.split(' ')[0].trim();
+            }
+
             const status = document.getElementById('scanStatus');
             const video = document.getElementById('cameraFeed');
+
+            if (!studentId) {
+                status.innerHTML = '<span style="color:#f59e0b;font-weight:700;">⚠️ Student ID Required: Please enter your Student ID before face scanning.</span>';
+                if (stuInput) {
+                    stuInput.focus();
+                    stuInput.style.borderColor = '#ef4444';
+                }
+                setTimeout(() => {
+                    blinkDetected = false;
+                    startEyeBlinkMonitor();
+                }, 1500);
+                return;
+            }
 
             // Fast optimized canvas capture (max 480px for instant upload & 0.05s recognition)
             let imageBase64 = '';
@@ -1677,10 +1745,14 @@
 
             if (!imageBase64) {
                 status.innerHTML = '<span style="color:#ef4444;">❌ Camera frame capture failed. Please ensure camera is active.</span>';
+                setTimeout(() => {
+                    blinkDetected = false;
+                    startEyeBlinkMonitor();
+                }, 1500);
                 return;
             }
 
-            status.innerHTML = '<span style="color:#55c7ff;">⚡ Verifying biometrics with trained model...</span>';
+            status.innerHTML = '<span style="color:#55c7ff;">⚡ Verifying Student ID ' + studentId + ' with live biometric model...</span>';
 
             const payload = {
                 image: imageBase64,
@@ -1703,15 +1775,23 @@
                     showSuccessPopup(data);
                     loadAttendanceRecords();
                 } else {
-                    status.innerHTML = `<span style="color:#ef4444;font-size:0.9rem;">${data.message}</span>`;
-                    // Fast non-blocking retry after 600ms
+                    if (data.mismatch) {
+                        status.innerHTML = `<span style="color:#ef4444;font-size:0.95rem;font-weight:700;display:block;line-height:1.4;">❌ FACE MISMATCH! The detected face does not match the entered Student ID. Attendance Not Marked.</span>`;
+                    } else {
+                        status.innerHTML = `<span style="color:#ef4444;font-size:0.9rem;font-weight:700;display:block;line-height:1.4;">${data.message}</span>`;
+                    }
+                    // Non-blocking retry after 2.5s so student can read message and try again
                     setTimeout(() => {
                         blinkDetected = false;
                         startEyeBlinkMonitor();
-                    }, 600);
+                    }, 2500);
                 }
             } catch (err) {
                 status.innerHTML = `<span style="color:#ef4444;">Error: ${err.message}</span>`;
+                setTimeout(() => {
+                    blinkDetected = false;
+                    startEyeBlinkMonitor();
+                }, 2000);
             }
         }
 

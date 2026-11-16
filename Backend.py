@@ -4,7 +4,8 @@ import threading
 import csv
 from flask import (
     Flask, request, jsonify, render_template_string,
-    render_template, redirect, session, url_for, send_from_directory
+    render_template, redirect, session, url_for, send_from_directory,
+    make_response
 )
 from math import radians, sin, cos, sqrt, atan2
 from datetime import datetime
@@ -676,14 +677,68 @@ def api_mark_face_attendance():
     image_b64 = data.get("image", "")
     claimed_student_id = str(data.get("student_id", "")).strip()
 
+    # Clean up student ID input if selected with name label (e.g., '987 - Omkar Chaurasiya' -> '987')
+    if " - " in claimed_student_id:
+        claimed_student_id = claimed_student_id.split(" - ")[0].strip()
+    elif " " in claimed_student_id:
+        claimed_student_id = claimed_student_id.split()[0].strip()
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # STRICT BIOMETRIC FACE VERIFICATION
+    # CRITICAL RULE 1: Student ID is strictly required
+    if not claimed_student_id:
+        return jsonify({
+            "success": False,
+            "status": "UNMARKED",
+            "error_type": "MISSING_STUDENT_ID",
+            "message": "⚠️ Student ID Required: Please enter your registered Student ID to proceed. Attendance Not Marked."
+        }), 400
+
+    # CRITICAL RULE 2: Validate Student ID against Database
+    student = check_student_id(claimed_student_id)
+    if not student:
+        return jsonify({
+            "success": False,
+            "status": "UNMARKED",
+            "error_type": "STUDENT_NOT_FOUND",
+            "message": f"❌ Student ID '{claimed_student_id}' Not Found in Database. Registration Required. Attendance Not Marked."
+        }), 404
+
+    now = datetime.now()
+    now_time = now.strftime("%H:%M:%S")
+    now_date = now.strftime("%d/%m/%Y")
+    csv_path = os.path.join(base_dir, "attendence.csv")
+
+    # CRITICAL RULE 3: Duplicate Attendance Check for Today
+    already_marked = False
+    if os.path.exists(csv_path):
+        try:
+            with open(csv_path, mode="r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if not row or str(row[0]).strip().lower() in ("student_id", "student id"):
+                        continue
+                    if len(row) >= 6:
+                        if str(row[0]).strip() == str(student[0]).strip() and str(row[5]).strip() == now_date:
+                            already_marked = True
+                            break
+        except Exception as csv_err:
+            print("CSV duplicate check error:", csv_err)
+
+    if already_marked:
+        return jsonify({
+            "success": False,
+            "status": "ALREADY_MARKED",
+            "message": f"⚠️ Attendance Already Marked: Student {student[1]} (ID: {claimed_student_id}) has already marked attendance for today ({now_date})."
+        }), 400
+
+    # CRITICAL RULE 4: Live Camera Frame Verification
     if not image_b64:
         return jsonify({
             "success": False,
+            "status": "UNMARKED",
             "biometric_failure": True,
-            "message": "❌ Camera image frame missing. Please keep your face clearly in front of the camera."
+            "message": "❌ Camera image frame missing. Please keep your face clearly in front of the camera. Attendance Not Marked."
         }), 400
 
     try:
@@ -701,8 +756,9 @@ def api_mark_face_attendance():
         if img is None:
             return jsonify({
                 "success": False,
+                "status": "UNMARKED",
                 "biometric_failure": True,
-                "message": "❌ Invalid camera frame received. Please ensure camera access."
+                "message": "❌ Invalid camera frame received. Please ensure camera access. Attendance Not Marked."
             }), 400
 
         clf, face_cascade = get_face_recognizer(base_dir)
@@ -710,6 +766,7 @@ def api_mark_face_attendance():
         if clf is None:
             return jsonify({
                 "success": False,
+                "status": "UNMARKED",
                 "message": "❌ Biometric model (classifier.xml) not found. Please train faces first."
             }), 500
 
@@ -726,11 +783,13 @@ def api_mark_face_attendance():
         # Optimized Haar parameters for fast 1-2 meters detection range
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=4, minSize=(30, 30))
 
+        # CRITICAL RULE 5: Live Face Detection
         if len(faces) == 0:
             return jsonify({
                 "success": False,
+                "status": "UNMARKED",
                 "biometric_failure": True,
-                "message": "❌ No face detected in camera stream! Please look directly at the camera in good lighting."
+                "message": "❌ Face Not Detected – Please look directly at the camera in good lighting. Attendance Not Marked."
             }), 400
 
         # Sort to find largest face
@@ -738,60 +797,57 @@ def api_mark_face_attendance():
         (x, y, w, h) = faces[0]
         face_roi = gray[y:y+h, x:x+w]
 
-        # 1. Anti-Spoofing & Liveness Texture Check
+        # CRITICAL RULE 6: Anti-Spoofing & Liveness Texture Check
         # Photos, printed papers, or blank screens lack natural facial contrast and 3D micro-depth
         lap_var = cv2.Laplacian(face_roi, cv2.CV_64F).var()
         contrast_std = float(np.std(face_roi))
         if lap_var < 3.0 or contrast_std < 18.0:
             return jsonify({
                 "success": False,
+                "status": "UNMARKED",
                 "biometric_failure": True,
                 "liveness_failure": True,
-                "message": "❌ Anti-Spoofing Check Failed: Static or blurred screen/photo detected. Please face the live camera in good lighting."
+                "message": "❌ Anti-Spoofing Check Failed: Static or blurred screen/photo detected. Live Face Required. Attendance Not Marked."
             }), 403
 
-        # 2. Predict identity using trained LBPH model
+        # Predict identity using trained LBPH model
         predicted_id, distance = clf.predict(face_roi)
         confidence = max(0, min(100, int(100 * (1.0 - distance / 85.0))))
 
-        # 3. BIOMETRIC ACCURACY THRESHOLD (Set to 65.0 for reliable 1-2m range detection)
+        # CRITICAL RULE 7: Biometric Confidence Threshold (Calibrated to 65.0 for 1-2m recognition)
         STRICT_THRESHOLD = 65.0
         if distance > STRICT_THRESHOLD:
             return jsonify({
                 "success": False,
+                "status": "UNMARKED",
                 "biometric_failure": True,
                 "distance": round(distance, 1),
                 "confidence": confidence,
                 "message": f"❌ Authentication Failed: Face Not Recognized. (Match distance: {round(distance, 1)}). Unknown or unauthorized faces cannot mark attendance."
             }), 403
 
-        # 4. IDENTITY FRAUD PREVENTION - PREVENT MARKING ANOTHER PERSON'S ATTENDANCE
-        if claimed_student_id and str(claimed_student_id) != str(predicted_id):
+        # CRITICAL RULE 8: STRICT STUDENT ID + LIVE FACE MATCHING
+        # Live face MUST match the registered face belonging to this exact Student ID!
+        if str(predicted_id).strip() != str(student[0]).strip():
             return jsonify({
                 "success": False,
+                "status": "UNMARKED",
                 "biometric_failure": True,
+                "mismatch": True,
                 "claimed_id": claimed_student_id,
                 "recognized_id": str(predicted_id),
-                "message": f"❌ Authentication Failed: Biometric Mismatch! The person in front of the camera is recognized as Student ID {predicted_id}, NOT Student ID {claimed_student_id}. You cannot mark attendance on behalf of another person!"
+                "message": "❌ FACE MISMATCH! The detected face does not match the entered Student ID. Attendance Not Marked."
             }), 403
-
-        student_id = str(predicted_id)
 
     except Exception as ex:
         print("Biometric processing error:", ex)
         return jsonify({
             "success": False,
+            "status": "UNMARKED",
             "message": f"Biometric verification error: {str(ex)}"
         }), 500
 
-    student = check_student_id(student_id)
-    if not student:
-        return jsonify({
-            "success": False,
-            "message": f"❌ Recognized student ID '{student_id}' not found in database. Please register first."
-        }), 404
-
-    # Geolocation 4 KM boundary check
+    # CRITICAL RULE 9: Geolocation 4 KM campus boundary check
     req_lat = data.get("latitude")
     req_lon = data.get("longitude")
     distance_meters = 50.0
@@ -811,6 +867,7 @@ def api_mark_face_attendance():
                 dist_km = round(distance_meters / 1000.0, 2)
                 return jsonify({
                     "success": False,
+                    "status": "UNMARKED",
                     "outside_boundary": True,
                     "distance": distance_meters,
                     "distance_km": dist_km,
@@ -821,11 +878,7 @@ def api_mark_face_attendance():
         except (ValueError, TypeError) as e:
             print("Location parse error:", e)
 
-    now = datetime.now()
-    now_time = now.strftime("%H:%M:%S")
-    now_date = now.strftime("%d/%m/%Y")
-
-    csv_path = os.path.join(base_dir, "attendence.csv")
+    # ONLY WHEN ALL 7 CONDITIONS PASS -> MARK ATTENDANCE AS PRESENT
     try:
         with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
@@ -839,6 +892,7 @@ def api_mark_face_attendance():
 
     return jsonify({
         "success": True,
+        "status": "PRESENT",
         "student_id": student[0],
         "name": student[1],
         "department": student[2],
@@ -848,7 +902,7 @@ def api_mark_face_attendance():
         "longitude": recorded_lon,
         "distance": distance_meters,
         "confidence": confidence,
-        "message": f"Biometric attendance verified & marked successfully for {student[1]} (ID: {student[0]})!"
+        "message": f"✅ Identity Verified – Attendance Marked Successfully for {student[1]} (ID: {student[0]})!"
     })
 
 @app.route("/api/admin-verify", methods=["POST"])
@@ -914,72 +968,174 @@ def api_admin_verify():
             "message": "❌ Authentication Failed: Invalid admin username or password. Access denied."
         }), 401
 
+@app.after_request
+def add_security_headers(response):
+    # Prevent caching of logout, exit, and protected admin endpoints
+    if request.path in ["/exit", "/logout", "/admin-portal"] or request.path.startswith("/api/admin"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "-1"
+    return response
+
 @app.route("/exit")
 @app.route("/logout")
 def exit_application_page():
     session.clear()
-    return render_template_string("""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Application Exited</title>
-        <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                background-color: #071426;
-                color: #ffffff;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-                padding: 20px;
-                text-align: center;
-            }
-            .exit-card {
-                background: #0b1f3a;
-                border: 1px solid #18385f;
-                border-radius: 14px;
-                padding: 44px 32px;
-                max-width: 500px;
-                width: 100%;
-                box-shadow: 0 14px 40px rgba(0,0,0,0.6);
-            }
-            .exit-icon { font-size: 3.8rem; margin-bottom: 16px; }
-            h2 { color: #55c7ff; font-size: 1.7rem; margin-bottom: 12px; }
-            p { color: #9db4cf; font-size: 0.95rem; line-height: 1.6; margin-bottom: 28px; }
-            .btn-group { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-            .btn {
-                padding: 12px 24px;
-                border-radius: 6px;
-                font-weight: 700;
-                font-size: 0.95rem;
-                text-decoration: none;
-                cursor: pointer;
-                border: none;
-                transition: all 0.2s;
-            }
-            .btn-close { background: #dc2626; color: #fff; }
-            .btn-close:hover { background: #b91c1c; }
-            .btn-home { background: #0d274c; color: #55c7ff; border: 1px solid #18385f; }
-            .btn-home:hover { background: #133966; }
-        </style>
-    </head>
-    <body>
-        <div class="exit-card">
-            <div class="exit-icon">&#128682;</div>
-            <h2>Application Exited</h2>
-            <p>You have successfully logged out and exited the Face Recognition Attendance System.<br>Session has been terminated. You may safely close this browser window or return to home.</p>
-            <div class="btn-group">
-                <button class="btn btn-close" onclick="window.open('', '_self', ''); window.close();">Close Window</button>
-                <a href="/" class="btn btn-home">Return to Home Screen</a>
-            </div>
+    html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Application Exited</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #071426;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            text-align: center;
+        }
+        .exit-card {
+            background: #0b1f3a;
+            border: 1px solid #18385f;
+            border-radius: 14px;
+            padding: 44px 32px;
+            max-width: 520px;
+            width: 100%;
+            box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+        }
+        .exit-icon { font-size: 3.8rem; margin-bottom: 16px; line-height: 1; }
+        h2 { color: #55c7ff; font-size: 1.75rem; margin-bottom: 12px; font-weight: 700; }
+        p.exit-desc { color: #9db4cf; font-size: 0.95rem; line-height: 1.6; margin-bottom: 28px; }
+        .btn-group { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            padding: 12px 26px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-close { background: #dc2626; color: #fff; }
+        .btn-close:hover { background: #b91c1c; transform: translateY(-1px); }
+        .btn-close:active { transform: translateY(0); }
+        .btn-home { background: #0d274c; color: #55c7ff; border: 1px solid #18385f; }
+        .btn-home:hover { background: #133966; transform: translateY(-1px); }
+        .btn-home:active { transform: translateY(0); }
+
+        .notice-card {
+            display: none;
+            margin-top: 24px;
+            padding: 16px 20px;
+            background: rgba(220, 38, 38, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 10px;
+            text-align: center;
+            animation: fadeIn 0.3s ease;
+        }
+        .notice-msg {
+            color: #fca5a5;
+            font-size: 0.93rem;
+            font-weight: 600;
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+        .notice-sub {
+            color: #cbd5e1;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+        .kbd-key {
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 4px;
+            padding: 2px 7px;
+            font-weight: 700;
+            color: #55c7ff;
+            font-family: Consolas, monospace;
+            font-size: 0.85rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="exit-card">
+        <div class="exit-icon">&#128682;</div>
+        <h2>Application Exited</h2>
+        <p class="exit-desc">You have successfully logged out and exited the Face Recognition Attendance System.<br>Session has been terminated. You may safely close this browser window or return to home.</p>
+        <div class="btn-group">
+            <button type="button" class="btn btn-close" id="btnCloseWindow" onclick="attemptCloseTab()">Close Window</button>
+            <a href="/" class="btn btn-home">Return to Home Screen</a>
         </div>
-    </body>
-    </html>
-    """)
+        <div id="closeTabNotice" class="notice-card">
+            <div class="notice-msg">&#9888;&#65039; Your browser does not allow this website to close the tab automatically. Please close this tab manually.</div>
+            <div class="notice-sub">Press <kbd class="kbd-key">Ctrl + W</kbd> (or <kbd class="kbd-key">&#8984; + W</kbd> on Mac) to close this tab.</div>
+        </div>
+    </div>
+
+    <script>
+        // Terminate client auth storage
+        try {
+            sessionStorage.clear();
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_user');
+            localStorage.removeItem('user_session');
+        } catch (e) {}
+
+        // Prevent browser back navigation from reopening protected dashboard sessions
+        if (window.history && window.history.pushState) {
+            window.history.pushState(null, null, window.location.href);
+            window.onpopstate = function () {
+                window.history.pushState(null, null, window.location.href);
+            };
+        }
+
+        function attemptCloseTab() {
+            // Attempt standard browser close
+            try {
+                window.close();
+            } catch (e) {}
+
+            try {
+                window.open('', '_self', '');
+                window.close();
+            } catch (e) {}
+
+            // If the browser blocked window.close() (standard security for tabs opened directly),
+            // display the clear message with keyboard shortcut instructions
+            setTimeout(function() {
+                var notice = document.getElementById('closeTabNotice');
+                if (notice) {
+                    notice.style.display = 'block';
+                    notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }, 150);
+        }
+    </script>
+</body>
+</html>"""
+    resp = make_response(render_template_string(html_content))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "-1"
+    return resp
 
 
 @app.route("/api/train-classifier", methods=["POST"])
