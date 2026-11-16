@@ -866,15 +866,16 @@
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Student ID *</label>
-                                <input type="text" id="m_student_id" placeholder="e.g. 213, 101" required>
+                                <input type="text" id="m_student_id" placeholder="e.g. 213, 101" required value="">
                             </div>
                             <div class="form-group">
                                 <label>Student Full Name *</label>
-                                <input type="text" id="m_student_name" placeholder="e.g. Rahul Sharma" required>
+                                <input type="text" id="m_student_name" placeholder="e.g. Rahul Sharma" required value="">
                             </div>
                             <div class="form-group">
                                 <label>Department *</label>
                                 <select id="m_dep" required>
+                                    <option value="" disabled selected>Select Department</option>
                                     <option value="Computer Science">Computer Science</option>
                                     <option value="Information Technology">Information Technology</option>
                                     <option value="AI & ML">AI & ML</option>
@@ -886,15 +887,18 @@
                             <div class="form-group">
                                 <label>Course *</label>
                                 <select id="m_course" required>
+                                    <option value="" disabled selected>Select Course</option>
                                     <option value="B.Tech">B.Tech</option>
                                     <option value="BCA">BCA</option>
                                     <option value="MCA">MCA</option>
+                                    <option value="M.Tech">M.Tech</option>
                                     <option value="Diploma">Diploma</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label>Year *</label>
                                 <select id="m_year" required>
+                                    <option value="" disabled selected>Select Year</option>
                                     <option value="1st Year">1st Year</option>
                                     <option value="2nd Year">2nd Year</option>
                                     <option value="3rd Year">3rd Year</option>
@@ -904,28 +908,34 @@
                             <div class="form-group">
                                 <label>Semester *</label>
                                 <select id="m_semester" required>
+                                    <option value="" disabled selected>Select Semester</option>
                                     <option value="Sem 1">Sem 1</option>
                                     <option value="Sem 2">Sem 2</option>
                                     <option value="Sem 3">Sem 3</option>
                                     <option value="Sem 4">Sem 4</option>
                                     <option value="Sem 5">Sem 5</option>
                                     <option value="Sem 6">Sem 6</option>
+                                    <option value="Sem 7">Sem 7</option>
+                                    <option value="Sem 8">Sem 8</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label>Roll Number *</label>
-                                <input type="text" id="m_roll" placeholder="e.g. 01" required>
+                                <input type="text" id="m_roll" placeholder="e.g. 01" required value="">
                             </div>
                             <div class="form-group">
-                                <label>Division</label>
-                                <select id="m_div">
-                                    <option value="A">Division A</option>
-                                    <option value="B">Division B</option>
+                                <label>Division *</label>
+                                <select id="m_div" required>
+                                    <option value="" disabled selected>Select Division</option>
+                                    <option value="Division A">Division A</option>
+                                    <option value="Division B">Division B</option>
+                                    <option value="Division C">Division C</option>
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label>Gender *</label>
                                 <select id="m_gender" required>
+                                    <option value="" disabled selected>Select Gender</option>
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
                                     <option value="Other">Other</option>
@@ -933,15 +943,15 @@
                             </div>
                             <div class="form-group">
                                 <label>Date of Birth</label>
-                                <input type="date" id="m_dob">
+                                <input type="date" id="m_dob" value="">
                             </div>
                             <div class="form-group">
                                 <label>Email Address</label>
-                                <input type="email" id="m_email" placeholder="student@example.com">
+                                <input type="email" id="m_email" placeholder="student@example.com" value="">
                             </div>
                             <div class="form-group">
                                 <label>Phone Number</label>
-                                <input type="tel" id="m_phone" placeholder="9876543210">
+                                <input type="tel" id="m_phone" placeholder="9876543210" value="">
                             </div>
                             <div class="form-group full">
                                 <label>Teacher / Mentor Name</label>
@@ -1009,6 +1019,58 @@
                     <button class="btn-action" style="background:#0d274c;width:100%;" onclick="openModal('modalTrain')">
                         &rarr; Go to Train Data to Retrain Model
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- MODAL: AI MODEL TRAINING & DATASET ENGINE  -->
+    <!-- ========================================== -->
+    <div id="modalTrain" class="modal-overlay" onclick="closeOnOutside(event, 'modalTrain')">
+        <div class="modal-box" style="max-width:620px;">
+            <div class="modal-header">
+                <h3>⚡ AI Model &amp; Training Engine</h3>
+                <button class="modal-close-btn" onclick="closeModal('modalTrain')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:#9db4cf;font-size:0.9rem;margin-bottom:16px;">
+                    Train the <strong>Local Binary Patterns Histograms (LBPH)</strong> Face Recognizer using biometric face samples stored in the dataset.
+                </p>
+
+                <div style="background:#071426;border:1px solid #18385f;border-radius:8px;padding:16px;margin-bottom:18px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #18385f;padding-bottom:8px;">
+                        <span style="color:#9db4cf;">Recognition Model:</span>
+                        <strong style="color:#55c7ff;">LBPH (Local Binary Patterns Histograms)</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #18385f;padding-bottom:8px;">
+                        <span style="color:#9db4cf;">Face Detector:</span>
+                        <strong style="color:#ffffff;">Haar Cascade (Frontal Face)</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #18385f;padding-bottom:8px;">
+                        <span style="color:#9db4cf;">Active Classifier File:</span>
+                        <strong style="color:#ffffff;" id="trainModelFile">classifier.xml (Active)</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #18385f;padding-bottom:8px;">
+                        <span style="color:#9db4cf;">Matching Threshold:</span>
+                        <strong style="color:#10b981;">Calibrated Distance &le; 65.0</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid #18385f;padding-bottom:8px;">
+                        <span style="color:#9db4cf;">Dataset Face Samples:</span>
+                        <strong id="trainSampleCount" style="color:#55c7ff;">Checking data folder...</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:#9db4cf;">Model Status:</span>
+                        <span id="trainBadge" style="background:#065f46;color:#34d399;padding:3px 10px;border-radius:12px;font-weight:700;font-size:0.8rem;">TRAINED • READY</span>
+                    </div>
+                </div>
+
+                <div style="text-align:center;">
+                    <button class="btn-action" id="btnTrainModel" style="background:#10b981;padding:12px 24px;font-size:1rem;font-weight:700;width:100%;margin-bottom:12px;" onclick="triggerWebTraining()">
+                        ⚡ Run AI Model Training Now
+                    </button>
+                    <div id="trainOutput" style="display:none;font-size:0.88rem;line-height:1.5;text-align:left;margin-top:10px;"></div>
                 </div>
             </div>
         </div>
@@ -1172,24 +1234,23 @@
             <div class="modal-body">
                 <div class="chat-box" id="chatMessages">
                     <div class="chat-bubble bubble-bot">
-                        Hello! I am your AI Attendance Assistant. Ask me anything about marking attendance, allowed
-                        campus radius, student registration, or developer details!
+                        Hello! I am your AI Attendance Assistant. Ask me anything about our AI &amp; ML algorithms (Haar Cascade face detection, LBPH face recognition, matching threshold 65.0, anti-spoofing), tech stack (Python, OpenCV, Flask, MySQL), registration, or technical viva questions!
                     </div>
                 </div>
 
                 <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-                    <button onclick="askPreset('How do I mark attendance?')"
-                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">How
-                        to attend?</button>
-                    <button onclick="askPreset('What are the allowed timings?')"
-                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Allowed
-                        timings?</button>
-                    <button onclick="askPreset('How can a student register?')"
-                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Registration
-                        steps?</button>
-                    <button onclick="askPreset('Who is the developer?')"
-                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Developer
-                        info?</button>
+                    <button onclick="askPreset('Which face detection and recognition algorithms are used in our project?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Algorithms Used?</button>
+                    <button onclick="askPreset('What is LBPH and how does it work?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">What is LBPH?</button>
+                    <button onclick="askPreset('What is face matching distance and the recognition threshold?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Distance &amp; Threshold (65.0)</button>
+                    <button onclick="askPreset('How does the system prevent fake attendance and proxy?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Anti-Spoofing?</button>
+                    <button onclick="askPreset('Why did we use Python, OpenCV, Flask, and MySQL?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Tech Stack?</button>
+                    <button onclick="askPreset('Why did we choose this project and what makes it AI-based?')"
+                        style="background:#0d274c;color:#55c7ff;border:1px solid #18385f;padding:5px 10px;border-radius:14px;font-size:0.75rem;cursor:pointer;">Viva Questions?</button>
                 </div>
 
                 <div class="chat-input-row">
@@ -1387,9 +1448,51 @@
         updateClock();
 
         // 2. Modal Management
+        function resetRegistrationForm() {
+            const form = document.getElementById('dashRegForm');
+            if (form) form.reset();
+            ['m_dep', 'm_course', 'm_year', 'm_semester', 'm_div', 'm_gender'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.selectedIndex = 0;
+            });
+            ['m_student_id', 'm_student_name', 'm_roll', 'm_dob', 'm_email', 'm_phone', 'm_teacher'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        }
+
+        async function loadDatasetStats() {
+            const sampleEl = document.getElementById('trainSampleCount');
+            if (!sampleEl) return;
+            sampleEl.textContent = 'Checking dataset samples...';
+            try {
+                const res = await fetch('/api/dataset-stats');
+                const data = await res.json();
+                if (data.success) {
+                    sampleEl.innerHTML = `<span style="color:#34d399;font-weight:700;">${data.total_samples} samples</span> across <span style="color:#55c7ff;font-weight:700;">${data.total_students} student(s)</span>`;
+                    if (data.classifier_exists) {
+                        const fileEl = document.getElementById('trainModelFile');
+                        if (fileEl) fileEl.textContent = `classifier.xml (${data.classifier_mtime || 'Active'})`;
+                    }
+                } else {
+                    sampleEl.textContent = 'No samples found';
+                }
+            } catch (e) {
+                sampleEl.textContent = 'Ready to train';
+            }
+        }
+
         function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'flex';
-            if (modalId === 'modalStudent') loadEnrolledStudents();
+            if (modalId === 'modalTrain') {
+                closeModal('modalStudent');
+                loadDatasetStats();
+            }
+            if (modalId === 'modalStudent') {
+                resetRegistrationForm();
+                loadEnrolledStudents();
+            }
+            const modalEl = document.getElementById(modalId);
+            if (modalEl) modalEl.style.display = 'flex';
             if (modalId === 'modalAttendance') loadAttendanceRecords();
             if (modalId === 'modalPhotos') loadSamplePhotos();
             if (modalId === 'modalAdmin') checkAdminState();
@@ -1524,7 +1627,7 @@
             btn.disabled = true;
             btn.textContent = '⏳ Training in Progress (Processing Dataset)...';
             out.style.display = 'block';
-            out.innerHTML = '<span style="color:#55c7ff;">Computing LBPH histograms across all face samples in data folder...</span>';
+            out.innerHTML = '<div style="color:#55c7ff;display:flex;align-items:center;gap:8px;"><span class="spinner" style="width:16px;height:16px;border:2px solid #55c7ff;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin 1s linear infinite;"></span> Computing LBPH histograms across all face samples in data folder...</div>';
 
             try {
                 const res = await fetch('/api/train-classifier', { method: 'POST' });
@@ -1538,6 +1641,7 @@
                         studentListHtml = '<ul style="margin:8px 0 0 18px;color:#34d399;">' + data.students.map(s => `<li>${s}</li>`).join('') + '</ul>';
                     }
                     out.innerHTML = `<div style="background:#064e3b;border:1px solid #059669;padding:12px;border-radius:6px;color:#d1fae5;"><strong>${data.message}</strong>${studentListHtml}</div>`;
+                    loadDatasetStats();
                 } else {
                     btn.textContent = '❌ Training Failed';
                     btn.style.background = '#dc2626';
@@ -1576,6 +1680,13 @@
                 phone: document.getElementById('m_phone').value.trim(),
                 teacher: document.getElementById('m_teacher').value.trim()
             };
+
+            if (!payload.student_id || !payload.student_name || !payload.dep || !payload.course || !payload.year || !payload.semester || !payload.roll || !payload.division || !payload.gender) {
+                alert("Please fill in all mandatory fields (*): Student ID, Student Full Name, Department, Course, Year, Semester, Roll Number, Division, and Gender.");
+                btn.disabled = false;
+                btn.textContent = 'Submit Registration Request & Notify Admin →';
+                return;
+            }
 
             try {
                 const res = await fetch('/api/submit-registration', {

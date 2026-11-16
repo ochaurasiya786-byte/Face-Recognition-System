@@ -375,9 +375,18 @@ def submit_registration_api():
     data = request.get_json(silent=True) or {}
     student_id = str(data.get("student_id", "")).strip()
     student_name = str(data.get("student_name", "")).strip()
+    dep = str(data.get("dep", "")).strip()
+    course = str(data.get("course", "")).strip()
+    year = str(data.get("year", "")).strip()
+    division = str(data.get("division", "")).strip()
+    gender = str(data.get("gender", "")).strip()
+    roll = str(data.get("roll", "")).strip()
 
-    if not student_id or not student_name:
-        return jsonify({"success": False, "message": "Student ID and Full Name are required."}), 400
+    if not student_id or not student_name or not dep or not course or not year or not roll or not division or not gender:
+        return jsonify({
+            "success": False,
+            "message": "All mandatory fields (*): Student ID, Full Name, Department, Course, Year, Roll, Division, and Gender are required."
+        }), 400
 
     conn = None
     cursor = None
@@ -409,15 +418,15 @@ def submit_registration_api():
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending')
         """
         values = (
-            data.get("dep", ""),
-            data.get("course", ""),
-            data.get("year", ""),
+            dep,
+            course,
+            year,
             data.get("semester", ""),
             student_id,
             student_name,
-            data.get("division", "A"),
-            data.get("roll", ""),
-            data.get("gender", ""),
+            division,
+            roll,
+            gender,
             data.get("dob", ""),
             data.get("email", ""),
             data.get("phone", ""),
@@ -595,37 +604,62 @@ def api_sample_photos():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(base_dir, "data")
     photos = []
+    total_files = 0
     if os.path.exists(data_dir):
         files = [f for f in os.listdir(data_dir) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+        total_files = len(files)
         photos = files[:40]
-    return jsonify({"success": True, "count": len(photos), "photos": photos})
+    return jsonify({"success": True, "count": len(photos), "total_count": total_files, "photos": photos})
+
+@app.route("/api/dataset-stats", methods=["GET"])
+def api_dataset_stats():
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
+    classifier_path = os.path.join(base_dir, "classifier.xml")
+
+    total_samples = 0
+    student_ids = set()
+    if os.path.exists(data_dir):
+        files = [f for f in os.listdir(data_dir) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+        total_samples = len(files)
+        for f in files:
+            parts = f.split(".")
+            if len(parts) >= 3:
+                try:
+                    student_ids.add(int(parts[1]))
+                except ValueError:
+                    pass
+
+    classifier_exists = os.path.exists(classifier_path)
+    classifier_mtime = ""
+    if classifier_exists:
+        try:
+            mtime = os.path.getmtime(classifier_path)
+            classifier_mtime = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            classifier_mtime = "Active"
+
+    return jsonify({
+        "success": True,
+        "total_samples": total_samples,
+        "total_students": len(student_ids),
+        "student_ids": sorted(list(student_ids)),
+        "classifier_exists": classifier_exists,
+        "classifier_mtime": classifier_mtime,
+        "threshold": 65.0,
+        "model_type": "LBPH (Local Binary Patterns Histograms)"
+    })
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     data = request.get_json(silent=True) or {}
-    msg = str(data.get("message", "")).strip().lower()
+    msg = str(data.get("message", "")).strip()
 
-    if not msg:
-        return jsonify({"reply": "Hello! How can I assist you with the Face Recognition Attendance System today?"})
-
-    if any(k in msg for k in ["attendance", "mark", "how to attend"]):
-        reply = "To mark attendance, click the 'Face Recognition' button on the dashboard to start camera recognition, or access '/mobile' on your phone within the college campus."
-    elif any(k in msg for k in ["time", "timing", "hours", "schedule"]):
-        reply = f"Allowed attendance timing is daily from {START_TIME} to {END_TIME}."
-    elif any(k in msg for k in ["register", "enroll", "student details", "admission"]):
-        reply = "New students can register by clicking 'Student Details' on the dashboard. Fill in your details and submit. An approval email will be sent to the Admin."
-    elif any(k in msg for k in ["distance", "radius", "location", "gps"]):
-        reply = f"The allowed campus radius for attendance is {RADIUS} meters around college coordinates ({COLLEGE_LAT}, {COLLEGE_LON})."
-    elif any(k in msg for k in ["admin", "approval", "reject", "panel"]):
-        reply = "Admins can approve or reject registration requests either directly via the email buttons sent to their Gmail, or via the 'Admin Panel' on the dashboard."
-    elif any(k in msg for k in ["developer", "creator", "who made", "author"]):
-        reply = "This AI-Based Face Recognition Attendance System was developed by Omkar Chaurasiya, Full Stack Developer (B.Tech CSE) at Khwaja Moinuddin Chishti Language University, Lucknow."
-    elif any(k in msg for k in ["model", "train", "algorithm", "accuracy"]):
-        reply = "The facial detection engine utilizes OpenCV Haar Cascade classifiers, and recognition is powered by the Local Binary Patterns Histograms (LBPH) Face Recognizer model."
-    elif any(k in msg for k in ["hello", "hi", "hey"]):
-        reply = "Hello! I am your AI Attendance Assistant. You can ask me about marking attendance, student registration, timings, or system features."
-    else:
-        reply = "I am the Face Recognition System AI Assistant. You can ask me how to mark attendance, registration steps, allowed timings (08:00 to 23:00), or developer info."
+    try:
+        from ai_help_desk import get_help_desk_response
+        reply = get_help_desk_response(msg)
+    except Exception as e:
+        reply = f"Error processing query: {str(e)}"
 
     return jsonify({"reply": reply})
 
@@ -1144,6 +1178,12 @@ def api_train_classifier():
         from train import train_dataset_engine
         base_dir = os.path.dirname(os.path.abspath(__file__))
         success, message, trained_students = train_dataset_engine(base_dir=base_dir, show_window=False)
+        
+        # Reset cached recognizer and mtime so the newly trained classifier.xml is loaded immediately
+        global _cached_classifier_mtime, _cached_recognizer
+        _cached_classifier_mtime = 0
+        _cached_recognizer = None
+
         return jsonify({
             "success": success,
             "message": message,
