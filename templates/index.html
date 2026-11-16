@@ -37,8 +37,8 @@
             height: 130px;
             overflow: hidden;
             border-right: 1px solid #18385f;
-            cursor: pointer;
-            transition: all 0.2s ease;
+            cursor: default;
+            transition: box-shadow 0.4s ease, border-color 0.4s ease;
         }
 
         .banner-img-box:last-child {
@@ -50,15 +50,18 @@
             height: 100%;
             object-fit: cover;
             display: block;
-            transition: transform 0.3s ease;
+            transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.45s ease;
+            will-change: transform, filter;
+            pointer-events: none;
         }
 
         .banner-img-box:hover {
-            box-shadow: inset 0 0 0 2px #55c7ff;
+            box-shadow: inset 0 0 0 2px #55c7ff, 0 4px 18px rgba(85, 199, 255, 0.18);
         }
 
         .banner-img-box:hover img {
-            transform: scale(1.02);
+            transform: scale(1.03);
+            filter: brightness(1.08) contrast(1.02);
         }
 
         /* Title Area */
@@ -651,13 +654,13 @@
 
     <!-- TOP 3 IMAGES BANNER -->
     <div class="top-banners">
-        <div class="banner-img-box" onclick="openModal('modalHelp')">
+        <div class="banner-img-box">
             <img src="/college_images/home1.jpg" alt="AI-Based Attendance System">
         </div>
-        <div class="banner-img-box" onclick="openModal('modalScan')">
+        <div class="banner-img-box">
             <img src="/college_images/img2.png" alt="Facial Detection">
         </div>
-        <div class="banner-img-box" onclick="openModal('modalScan')">
+        <div class="banner-img-box">
             <img src="/college_images/face.png" alt="Best Facial Recognition">
         </div>
     </div>
