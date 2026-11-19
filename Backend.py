@@ -134,6 +134,12 @@ ACTION_CONFIRM_TEMPLATE = """
             </table>
 
             <form method="POST">
+                {% if action == 'reject' %}
+                <div style="margin-bottom: 16px; text-align: left;">
+                    <label for="rejection_reason" style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px;">Rejection Reason (included in notification to student):</label>
+                    <textarea name="rejection_reason" id="rejection_reason" rows="3" placeholder="e.g. Invalid face photo, incorrect department, invalid details..." style="width:100%;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;resize:vertical;" required>Profile details do not match institutional records or photo verification failed.</textarea>
+                </div>
+                {% endif %}
                 <button type="submit" class="btn-submit">
                     Confirm {{ action_upper }}
                 </button>
@@ -243,6 +249,40 @@ RADIUS = 4000
 START_TIME = "08:00"
 END_TIME = "23:00"
 
+def get_ist_timezone():
+    """
+    Returns timezone object for Asia/Kolkata (IST, UTC+5:30).
+    Uses ZoneInfo when available (Linux/Render/cloud), falling back gracefully
+    to fixed UTC+5:30 offset on systems without tzdata (e.g. Windows).
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("Asia/Kolkata")
+    except Exception:
+        from datetime import timezone, timedelta
+        return timezone(timedelta(hours=5, minutes=30))
+
+def get_current_ist_datetime():
+    """
+    Returns current datetime in Asia/Kolkata (IST, UTC+5:30) timezone.
+    Guarantees reliable timezone resolution on Windows, Linux, Render, Docker, or UTC cloud environments.
+    """
+    return datetime.now(get_ist_timezone())
+
+def is_attendance_time_allowed(dt=None):
+    """
+    Checks if given datetime (default: current IST time) is within permitted hours:
+    08:00 AM <= Current IST <= 11:00 PM (inclusive of 11:00 PM up to 23:00:59, rejecting 11:01 PM).
+    """
+    if dt is None:
+        dt = get_current_ist_datetime()
+
+    minutes = dt.hour * 60 + dt.minute
+    start_minutes = 8 * 60    # 08:00 AM -> 480
+    end_minutes = 23 * 60     # 11:00 PM -> 1380
+
+    return start_minutes <= minutes <= end_minutes
+
 # VERIFICATION STORAGE
 
 verified_students = {}
@@ -293,7 +333,9 @@ def check_student_id(student_id):
             SELECT
                 Student_ID,
                 Student_Name,
-                Dep
+                Dep,
+                Course,
+                Roll
             FROM student
             WHERE Student_ID=%s
             LIMIT 1
@@ -302,6 +344,23 @@ def check_student_id(student_id):
         )
 
         result = cursor.fetchone()
+        if not result:
+            cursor.execute(
+                """
+                SELECT
+                    Student_ID,
+                    Student_Name,
+                    Dep,
+                    Course,
+                    Roll
+                FROM student_requests
+                WHERE Student_ID=%s AND Status IN ('Approved', 'Pending')
+                LIMIT 1
+                """,
+                (str(student_id).strip(),)
+            )
+            result = cursor.fetchone()
+
         return result
 
     except Exception as e:
@@ -394,21 +453,46 @@ def submit_registration_api():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Check if already enrolled in student table
+        # 1. Check if Student ID already exists in student table
         cursor.execute("SELECT Student_ID FROM student WHERE Student_ID = %s LIMIT 1", (student_id,))
         if cursor.fetchone():
             return jsonify({
                 "success": False,
-                "message": f"Student ID '{student_id}' is already registered in the system."
-            }), 400
+                "already_registered": True,
+                "title": "Already Registered!",
+                "message": "This student is already registered in the system. Please use your existing Student ID or contact the administrator."
+            }), 409
 
-        # Check if a pending request already exists
-        cursor.execute("SELECT Request_ID FROM student_requests WHERE Student_ID = %s AND Status = 'Pending' LIMIT 1", (student_id,))
+        # 2. Check if Student ID already exists in pending or approved requests
+        cursor.execute("SELECT Request_ID FROM student_requests WHERE Student_ID = %s AND Status IN ('Pending', 'Approved') LIMIT 1", (student_id,))
         if cursor.fetchone():
             return jsonify({
                 "success": False,
-                "message": f"A registration request for Student ID '{student_id}' is already pending admin approval."
-            }), 400
+                "already_registered": True,
+                "title": "Already Registered!",
+                "message": "This student is already registered in the system. Please use your existing Student ID or contact the administrator."
+            }), 409
+
+        # 3. Check if registered Email already exists
+        email = str(data.get("email", "")).strip()
+        if email:
+            cursor.execute("SELECT Student_ID FROM student WHERE LOWER(Email) = LOWER(%s) LIMIT 1", (email,))
+            if cursor.fetchone():
+                return jsonify({
+                    "success": False,
+                    "already_registered": True,
+                    "title": "Already Registered!",
+                    "message": "This student is already registered in the system. Please use your existing Student ID or contact the administrator."
+                }), 409
+
+            cursor.execute("SELECT Request_ID FROM student_requests WHERE LOWER(Email) = LOWER(%s) AND Status IN ('Pending', 'Approved') LIMIT 1", (email,))
+            if cursor.fetchone():
+                return jsonify({
+                    "success": False,
+                    "already_registered": True,
+                    "title": "Already Registered!",
+                    "message": "This student is already registered in the system. Please use your existing Student ID or contact the administrator."
+                }), 409
 
         # Insert new request
         sql = """
@@ -707,66 +791,21 @@ threading.Thread(target=_prewarm_biometrics, daemon=True).start()
 
 @app.route("/api/mark-face-attendance", methods=["POST"])
 def api_mark_face_attendance():
+    # CRITICAL RULE 1: Time Verification (Asia/Kolkata IST 08:00 AM - 11:00 PM)
+    if not is_attendance_time_allowed():
+        return jsonify({
+            "success": False,
+            "status": "UNMARKED",
+            "time_restricted": True,
+            "message": "❌ Verification Failed: Attendance is allowed only between 8:00 AM and 11:00 PM."
+        }), 403
+
     data = request.get_json(silent=True) or {}
     image_b64 = data.get("image", "")
-    claimed_student_id = str(data.get("student_id", "")).strip()
-
-    # Clean up student ID input if selected with name label (e.g., '987 - Omkar Chaurasiya' -> '987')
-    if " - " in claimed_student_id:
-        claimed_student_id = claimed_student_id.split(" - ")[0].strip()
-    elif " " in claimed_student_id:
-        claimed_student_id = claimed_student_id.split()[0].strip()
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # CRITICAL RULE 1: Student ID is strictly required
-    if not claimed_student_id:
-        return jsonify({
-            "success": False,
-            "status": "UNMARKED",
-            "error_type": "MISSING_STUDENT_ID",
-            "message": "⚠️ Student ID Required: Please enter your registered Student ID to proceed. Attendance Not Marked."
-        }), 400
-
-    # CRITICAL RULE 2: Validate Student ID against Database
-    student = check_student_id(claimed_student_id)
-    if not student:
-        return jsonify({
-            "success": False,
-            "status": "UNMARKED",
-            "error_type": "STUDENT_NOT_FOUND",
-            "message": f"❌ Student ID '{claimed_student_id}' Not Found in Database. Registration Required. Attendance Not Marked."
-        }), 404
-
-    now = datetime.now()
-    now_time = now.strftime("%H:%M:%S")
-    now_date = now.strftime("%d/%m/%Y")
-    csv_path = os.path.join(base_dir, "attendence.csv")
-
-    # CRITICAL RULE 3: Duplicate Attendance Check for Today
-    already_marked = False
-    if os.path.exists(csv_path):
-        try:
-            with open(csv_path, mode="r", encoding="utf-8") as f:
-                reader = csv.reader(f)
-                for row in reader:
-                    if not row or str(row[0]).strip().lower() in ("student_id", "student id"):
-                        continue
-                    if len(row) >= 6:
-                        if str(row[0]).strip() == str(student[0]).strip() and str(row[5]).strip() == now_date:
-                            already_marked = True
-                            break
-        except Exception as csv_err:
-            print("CSV duplicate check error:", csv_err)
-
-    if already_marked:
-        return jsonify({
-            "success": False,
-            "status": "ALREADY_MARKED",
-            "message": f"⚠️ Attendance Already Marked: Student {student[1]} (ID: {claimed_student_id}) has already marked attendance for today ({now_date})."
-        }), 400
-
-    # CRITICAL RULE 4: Live Camera Frame Verification
+    # CRITICAL RULE 2: Live Camera Frame Verification
     if not image_b64:
         return jsonify({
             "success": False,
@@ -817,7 +856,7 @@ def api_mark_face_attendance():
         # Optimized Haar parameters for fast 1-2 meters detection range
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=4, minSize=(30, 30))
 
-        # CRITICAL RULE 5: Live Face Detection
+        # CRITICAL RULE 3: Live Face Detection
         if len(faces) == 0:
             return jsonify({
                 "success": False,
@@ -831,8 +870,7 @@ def api_mark_face_attendance():
         (x, y, w, h) = faces[0]
         face_roi = gray[y:y+h, x:x+w]
 
-        # CRITICAL RULE 6: Anti-Spoofing & Liveness Texture Check
-        # Photos, printed papers, or blank screens lack natural facial contrast and 3D micro-depth
+        # CRITICAL RULE 4: Anti-Spoofing & Liveness Texture Check
         lap_var = cv2.Laplacian(face_roi, cv2.CV_64F).var()
         contrast_std = float(np.std(face_roi))
         if lap_var < 3.0 or contrast_std < 18.0:
@@ -844,34 +882,46 @@ def api_mark_face_attendance():
                 "message": "❌ Anti-Spoofing Check Failed: Static or blurred screen/photo detected. Live Face Required. Attendance Not Marked."
             }), 403
 
-        # Predict identity using trained LBPH model
+        # CRITICAL RULE 5: Automatic Student Identification via Trained LBPH Model
         predicted_id, distance = clf.predict(face_roi)
         confidence = max(0, min(100, int(100 * (1.0 - distance / 85.0))))
 
-        # CRITICAL RULE 7: Biometric Confidence Threshold (Calibrated to 65.0 for 1-2m recognition)
-        STRICT_THRESHOLD = 65.0
-        if distance > STRICT_THRESHOLD:
+        # Calibrated threshold: distance <= 65.0 is recognized
+        if distance > 70.0:
             return jsonify({
                 "success": False,
                 "status": "UNMARKED",
-                "biometric_failure": True,
+                "unknown_student": True,
                 "distance": round(distance, 1),
                 "confidence": confidence,
-                "message": f"❌ Authentication Failed: Face Not Recognized. (Match distance: {round(distance, 1)}). Unknown or unauthorized faces cannot mark attendance."
+                "message": f"❌ Unknown Student – Face not recognized in the system (distance: {round(distance, 1)}). Unauthorized faces cannot mark attendance."
             }), 403
 
-        # CRITICAL RULE 8: STRICT STUDENT ID + LIVE FACE MATCHING
-        # Live face MUST match the registered face belonging to this exact Student ID!
-        if str(predicted_id).strip() != str(student[0]).strip():
+        if distance > 65.0:
             return jsonify({
                 "success": False,
                 "status": "UNMARKED",
-                "biometric_failure": True,
-                "mismatch": True,
-                "claimed_id": claimed_student_id,
-                "recognized_id": str(predicted_id),
-                "message": "❌ FACE MISMATCH! The detected face does not match the entered Student ID. Attendance Not Marked."
+                "uncertain_match": True,
+                "distance": round(distance, 1),
+                "confidence": confidence,
+                "message": f"⚠️ Face match uncertain (distance: {round(distance, 1)}). Please face the camera clearly and try again."
             }), 403
+
+        # Retrieve registered identity from Database using the recognized student ID
+        student = check_student_id(str(predicted_id))
+        if not student:
+            return jsonify({
+                "success": False,
+                "status": "UNMARKED",
+                "unknown_student": True,
+                "message": f"❌ Unknown Student: Recognized identity (ID: {predicted_id}) is not found in the student database."
+            }), 404
+
+        student_id = str(student[0]).strip()
+        student_name = str(student[1]).strip()
+        department = str(student[2]).strip()
+        course = str(student[3]).strip() if len(student) > 3 and student[3] else ""
+        roll = str(student[4]).strip() if len(student) > 4 and student[4] else "1"
 
     except Exception as ex:
         print("Biometric processing error:", ex)
@@ -881,7 +931,37 @@ def api_mark_face_attendance():
             "message": f"Biometric verification error: {str(ex)}"
         }), 500
 
-    # CRITICAL RULE 9: Geolocation 4 KM campus boundary check
+    # CRITICAL RULE 6: Duplicate Attendance Check for Today (Asia/Kolkata IST)
+    now_ist = get_current_ist_datetime()
+    now_time = now_ist.strftime("%H:%M:%S")
+    now_date = now_ist.strftime("%d/%m/%Y")
+    csv_path = os.path.join(base_dir, "attendence.csv")
+
+    already_marked = False
+    if os.path.exists(csv_path):
+        try:
+            with open(csv_path, mode="r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if not row or str(row[0]).strip().lower() in ("student_id", "student id"):
+                        continue
+                    if len(row) >= 6:
+                        if str(row[0]).strip() == student_id and str(row[5]).strip() == now_date:
+                            already_marked = True
+                            break
+        except Exception as csv_err:
+            print("CSV duplicate check error:", csv_err)
+
+    if already_marked:
+        return jsonify({
+            "success": False,
+            "status": "ALREADY_MARKED",
+            "student_id": student_id,
+            "name": student_name,
+            "message": f"⚠️ Attendance Already Marked: Student {student_name} (ID: {student_id}) has already marked attendance for today ({now_date})."
+        }), 400
+
+    # CRITICAL RULE 7: Geolocation 4 KM campus boundary check
     req_lat = data.get("latitude")
     req_lon = data.get("longitude")
     distance_meters = 50.0
@@ -903,6 +983,8 @@ def api_mark_face_attendance():
                     "success": False,
                     "status": "UNMARKED",
                     "outside_boundary": True,
+                    "student_id": student_id,
+                    "name": student_name,
                     "distance": distance_meters,
                     "distance_km": dist_km,
                     "latitude": req_lat,
@@ -912,31 +994,54 @@ def api_mark_face_attendance():
         except (ValueError, TypeError) as e:
             print("Location parse error:", e)
 
-    # ONLY WHEN ALL 7 CONDITIONS PASS -> MARK ATTENDANCE AS PRESENT
+    # ONLY WHEN ALL CHECKS PASS -> RECORD ATTENDANCE AS PRESENT
     try:
         with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow([
-                student[0], "1", student[1], student[2],
+                student_id, roll, student_name, department,
                 now_time, now_date, str(recorded_lat), str(recorded_lon),
                 str(distance_meters), f"Biometric-{confidence}%", "Verified", "Verified", "Present"
             ])
     except Exception as e:
-        print("Error recording attendance:", e)
+        print("Error recording attendance CSV:", e)
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO attendance (
+                Student_ID, Roll, Name, Department,
+                Time, Date, Latitude, Longitude, Distance,
+                Confidence, Status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Present')
+            """,
+            (student_id, roll, student_name, department, now_time, now_date, recorded_lat, recorded_lon, distance_meters, confidence)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        pass
 
     return jsonify({
         "success": True,
         "status": "PRESENT",
-        "student_id": student[0],
-        "name": student[1],
-        "department": student[2],
+        "student_identified": True,
+        "student_id": student_id,
+        "name": student_name,
+        "department": department,
+        "course": course,
+        "roll": roll,
         "time": now_time,
         "date": now_date,
         "latitude": recorded_lat,
         "longitude": recorded_lon,
         "distance": distance_meters,
+        "match_distance": round(distance, 1),
         "confidence": confidence,
-        "message": f"✅ Identity Verified – Attendance Marked Successfully for {student[1]} (ID: {student[0]})!"
+        "message": f"Student Identified Successfully\nStudent Name: {student_name}\nStudent ID: {student_id}"
     })
 
 @app.route("/api/admin-verify", methods=["POST"])
@@ -1297,13 +1402,9 @@ def email_action(token):
             action_done=True
         )
 
-    # If GET and auto execution is not requested, show the review/confirmation card
-    is_auto = (
-        request.args.get("auto") in ("1", "true", "yes")
-        or request.args.get("confirm") in ("1", "true", "yes")
-    )
-
-    if request.method == "GET" and not is_auto:
+    # For safety against email link prefetching by scanners/bots,
+    # require explicit POST to execute approval/rejection.
+    if request.method != "POST":
         return render_template_string(
             ACTION_CONFIRM_TEMPLATE,
             req=req,
@@ -1313,7 +1414,8 @@ def email_action(token):
         )
 
     # Process action in MySQL transaction
-    result = process_approval_action(request_id, action)
+    rejection_reason = request.form.get("rejection_reason", "").strip() if action == "reject" else None
+    result = process_approval_action(request_id, action, reason=rejection_reason)
     if result.get("success"):
         color = "#16a34a" if action == "approve" else "#dc2626"
         icon = "✅" if action == "approve" else "🚫"
@@ -1825,24 +1927,7 @@ def verify_pc_location():
             })
 
         # CHECK TIME
-
-        current_time = datetime.now().time()
-
-        start_time = datetime.strptime(
-            START_TIME,
-            "%H:%M"
-        ).time()
-
-        end_time = datetime.strptime(
-            END_TIME,
-            "%H:%M"
-        ).time()
-
-        if (
-            current_time < start_time
-            or current_time >= end_time
-        ):
-
+        if not is_attendance_time_allowed():
             return jsonify({
                 "success": False,
                 "student_verified": True,
@@ -2272,44 +2357,19 @@ def verify_location():
             })
 
         # TIME
-
-        current_time = datetime.now().time()
-
-        start_time = datetime.strptime(
-            START_TIME,
-            "%H:%M"
-        ).time()
-
-        end_time = datetime.strptime(
-            END_TIME,
-            "%H:%M"
-        ).time()
-
-        if (
-            current_time < start_time
-            or current_time >= end_time
-        ):
-
+        if not is_attendance_time_allowed():
             return jsonify({
-
                 "success": False,
-
                 "student_verified": True,
-
                 "location_verified": False,
-
                 "time_verified": False,
-
                 "student_id":
                     student[0],
-
                 "student_name":
                     student[1],
-
                 "message":
                     "Attendance is allowed only "
                     "between 8:00 AM and 11:00 PM."
-
             })
 
         # GPS FLOAT

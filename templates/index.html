@@ -1104,16 +1104,30 @@
                     Ready to scan face...
                 </div>
 
-                <div style="margin-bottom:14px;max-width:380px;margin-left:auto;margin-right:auto;text-align:left;">
-                    <label for="scanStudentId" style="font-size:0.85rem;color:#55c7ff;display:block;margin-bottom:6px;font-weight:700;">
-                        Enter Registered Student ID <span style="color:#ef4444;">*</span>:
-                    </label>
-                    <input type="text" id="scanStudentId" list="enrolledStudentsList" value="" placeholder="Enter or select Student ID (e.g. 987)" required
-                        style="text-align:center;font-weight:700;width:100%;font-size:1.05rem;padding:10px 14px;border:2px solid #1e40af;border-radius:8px;background:#0d2342;color:#ffffff;box-sizing:border-box;outline:none;"
-                        autocomplete="off">
-                    <datalist id="enrolledStudentsList"></datalist>
-                    <div id="scanIdHelp" style="font-size:0.75rem;color:#94a3b8;margin-top:5px;text-align:center;">
-                        Attendance strictly compares your live webcam face against this registered Student ID.
+                <div id="scanIdentityBox" style="margin-bottom:14px;max-width:440px;margin-left:auto;margin-right:auto;text-align:center;">
+                    <div id="scanAutoStatus" style="font-size:0.85rem;color:#93c5fd;margin-bottom:8px;background:rgba(13,35,66,0.6);border:1px solid #1e3a8a;border-radius:6px;padding:8px 12px;">
+                        <span>&#128065; <strong>Automatic Face Identification:</strong> Live biometric recognition active. Please look directly into the camera.</span>
+                    </div>
+                    <div id="detectedStudentCard" style="display:none;background:#071426;border:2px solid #10b981;border-radius:10px;padding:14px;text-align:left;box-shadow:0 0 20px rgba(16,185,129,0.3);margin-bottom:8px;">
+                        <div style="font-size:0.78rem;font-weight:700;color:#10b981;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                            <span>&#10004;</span> Verified Student Identity
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #18385f;">
+                            <span style="color:#9db4cf;font-size:0.85rem;">Student Name:</span>
+                            <strong id="detName" style="color:#ffffff;font-size:0.92rem;">-</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #18385f;">
+                            <span style="color:#9db4cf;font-size:0.85rem;">Student ID:</span>
+                            <strong id="detId" style="color:#55c7ff;font-size:0.92rem;">-</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #18385f;">
+                            <span style="color:#9db4cf;font-size:0.85rem;">Course:</span>
+                            <strong id="detCourse" style="color:#ffffff;font-size:0.85rem;">-</strong>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;padding:3px 0;">
+                            <span style="color:#9db4cf;font-size:0.85rem;">Branch / Dept:</span>
+                            <strong id="detDept" style="color:#cbd5e1;font-size:0.85rem;">-</strong>
+                        </div>
                     </div>
                 </div>
 
@@ -1170,6 +1184,22 @@
             <button class="btn-action" style="background:#10b981;width:100%;font-size:1rem;padding:12px;"
                 onclick="closeSuccessPopup()">
                 &#10004; Done / Continue
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL: ALREADY REGISTERED POPUP -->
+    <!-- ========================================== -->
+    <div id="modalAlreadyRegistered" class="modal-overlay" style="display:none;z-index:10001;align-items:center;justify-content:center;">
+        <div class="modal-box" style="max-width:480px;text-align:center;border:2px solid #ef4444;box-shadow:0 0 35px rgba(239,68,68,0.45);background:#071426;border-radius:12px;padding:26px 22px;">
+            <div style="font-size:3.5rem;margin-bottom:10px;">&#9888;&#65039;</div>
+            <h3 style="color:#ef4444;font-size:1.5rem;font-weight:800;margin-bottom:10px;">Already Registered!</h3>
+            <p id="alreadyRegisteredMsg" style="color:#cbd5e1;font-size:0.95rem;line-height:1.6;margin-bottom:22px;">
+                This student is already registered in the system. Please use your existing Student ID or contact the administrator.
+            </p>
+            <button type="button" class="btn-action" style="background:#ef4444;width:100%;font-size:1rem;font-weight:700;padding:12px;border-radius:8px;border:none;cursor:pointer;color:#ffffff;" onclick="closeModal('modalAlreadyRegistered')">
+                &#10004; Understood
             </button>
         </div>
     </div>
@@ -1700,7 +1730,11 @@
                     document.getElementById('dashRegForm').reset();
                     closeModal('modalStudent');
                 } else {
-                    alert('ERROR: ' + data.message);
+                    if (data.already_registered) {
+                        showAlreadyRegisteredPopup(data.message);
+                    } else {
+                        alert('ERROR: ' + data.message);
+                    }
                 }
             } catch (err) {
                 alert('Submission error: ' + err.message);
@@ -1708,6 +1742,12 @@
                 btn.disabled = false;
                 btn.textContent = 'Submit Registration Request & Notify Admin →';
             }
+        }
+
+        function showAlreadyRegisteredPopup(msg) {
+            const el = document.getElementById('alreadyRegisteredMsg');
+            if (el && msg) el.textContent = msg;
+            openModal('modalAlreadyRegistered');
         }
 
         let enrolledCache = [];
@@ -1783,24 +1823,13 @@
 
         async function startAttendanceFlow() {
             openModal('modalScan');
-            const stuInput = document.getElementById('scanStudentId');
             const status = document.getElementById('scanStatus');
-            status.innerHTML = '<span style="color:#55c7ff;">Checking campus location &amp; opening camera...</span>';
+            const detCard = document.getElementById('detectedStudentCard');
+            if (detCard) detCard.style.display = 'none';
 
-            // Ensure enrolled students datalist is populated for quick Student ID selection
-            if (!enrolledCache || enrolledCache.length === 0) {
-                loadEnrolledStudents();
-            } else {
-                populateStudentIdDatalist(enrolledCache);
-            }
+            status.innerHTML = '<span style="color:#55c7ff;">Verifying campus location &amp; opening camera...</span>';
 
-            if (stuInput) {
-                stuInput.value = '';
-                stuInput.style.borderColor = '#1e40af';
-                setTimeout(() => stuInput.focus(), 250);
-            }
-
-            // Directly launch camera - NO clicks needed!
+            // Directly launch camera - NO clicks or manual ID required!
             await startCamera();
 
             // Check device location for 4 km boundary
@@ -1820,21 +1849,22 @@
                             closeModal('modalScan');
                             return;
                         } else {
-                            status.innerHTML = `<span style="color:#10b981;">&#128205; Location Verified (${dist}m) &bull; Enter/select Student ID &amp; BLINK eyes!</span>`;
+                            status.innerHTML = `<span style="color:#10b981;">&#128205; Campus Verified (${dist}m) &bull; Look directly at the camera &amp; blink naturally!</span>`;
                         }
                     },
                     (err) => {
                         console.warn('Geolocation unavailable:', err.message);
                         userLocation = { latitude: COLLEGE_LAT, longitude: COLLEGE_LON, distance: 50 };
-                        status.innerHTML = '<span style="color:#10b981;">&#9679; Camera Active &bull; Enter Student ID &amp; BLINK eyes to mark attendance!</span>';
+                        status.innerHTML = '<span style="color:#10b981;">&#9679; Camera Active &bull; Look directly at the camera &amp; blink naturally to mark attendance!</span>';
                     },
                     { enableHighAccuracy: true, timeout: 5000 }
                 );
             } else {
                 userLocation = { latitude: COLLEGE_LAT, longitude: COLLEGE_LON, distance: 50 };
+                status.innerHTML = '<span style="color:#10b981;">&#9679; Camera Active &bull; Look directly at the camera &amp; blink naturally to mark attendance!</span>';
             }
 
-            // Start automated Eye Blink Detection
+            // Start automated Eye Blink & Liveness Detection
             startEyeBlinkMonitor();
         }
 
@@ -1889,37 +1919,18 @@
                     const isBlink = prevAvg !== null && Math.abs(avg - prevAvg) > 8;
                     prevAvg = avg;
 
-                    // Fast trigger: upon blink or within 0.5s of centering face
+                    // Fast trigger: upon natural eye blink or within centered frame window
                     if ((isBlink && frames >= 2) || frames >= 10) {
-                        const stuInput = document.getElementById('scanStudentId');
-                        const sid = stuInput ? stuInput.value.trim() : '';
-                        if (!sid) {
-                            status.innerHTML = '<span style="color:#f59e0b;font-weight:700;">⚠️ Please enter or select your registered Student ID first to mark attendance.</span>';
-                            if (stuInput) {
-                                stuInput.style.borderColor = '#ef4444';
-                                stuInput.focus();
-                            }
-                            return;
-                        }
                         blinkDetected = true;
                         clearInterval(blinkInterval);
-                        status.innerHTML = '<span style="color:#34d399;">⚡ Liveness Verified! Verifying Student ID &amp; Face...</span>';
+                        status.innerHTML = '<span style="color:#34d399;">⚡ Liveness Verified! Scanning face &amp; identifying student...</span>';
                         await captureAndVerifyFace();
                     }
                 } catch (e) {
                     if (frames >= 8) {
-                        const stuInput = document.getElementById('scanStudentId');
-                        const sid = stuInput ? stuInput.value.trim() : '';
-                        if (!sid) {
-                            status.innerHTML = '<span style="color:#f59e0b;font-weight:700;">⚠️ Please enter or select your registered Student ID first to mark attendance.</span>';
-                            if (stuInput) {
-                                stuInput.style.borderColor = '#ef4444';
-                                stuInput.focus();
-                            }
-                            return;
-                        }
                         blinkDetected = true;
                         clearInterval(blinkInterval);
+                        status.innerHTML = '<span style="color:#34d399;">⚡ Liveness Verified! Scanning face &amp; identifying student...</span>';
                         await captureAndVerifyFace();
                     }
                 }
@@ -1927,29 +1938,8 @@
         }
 
         async function captureAndVerifyFace() {
-            const stuInput = document.getElementById('scanStudentId');
-            let studentId = stuInput ? stuInput.value.trim() : '';
-            if (studentId.includes(' - ')) {
-                studentId = studentId.split(' - ')[0].trim();
-            } else if (studentId.includes(' ')) {
-                studentId = studentId.split(' ')[0].trim();
-            }
-
             const status = document.getElementById('scanStatus');
             const video = document.getElementById('cameraFeed');
-
-            if (!studentId) {
-                status.innerHTML = '<span style="color:#f59e0b;font-weight:700;">⚠️ Student ID Required: Please enter your Student ID before face scanning.</span>';
-                if (stuInput) {
-                    stuInput.focus();
-                    stuInput.style.borderColor = '#ef4444';
-                }
-                setTimeout(() => {
-                    blinkDetected = false;
-                    startEyeBlinkMonitor();
-                }, 1500);
-                return;
-            }
 
             // Fast optimized canvas capture (max 480px for instant upload & 0.05s recognition)
             let imageBase64 = '';
@@ -1977,11 +1967,10 @@
                 return;
             }
 
-            status.innerHTML = '<span style="color:#55c7ff;">⚡ Verifying Student ID ' + studentId + ' with live biometric model...</span>';
+            status.innerHTML = '<span style="color:#55c7ff;">⚡ Scanning face against registered biometric database...</span>';
 
             const payload = {
                 image: imageBase64,
-                student_id: studentId,
                 latitude: userLocation ? userLocation.latitude : COLLEGE_LAT,
                 longitude: userLocation ? userLocation.longitude : COLLEGE_LON
             };
@@ -1995,15 +1984,35 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    stopCamera();
-                    closeModal('modalScan');
-                    showSuccessPopup(data);
-                    loadAttendanceRecords();
+                    // Auto-render detected student identity in the card
+                    const detCard = document.getElementById('detectedStudentCard');
+                    const detName = document.getElementById('detName');
+                    const detId = document.getElementById('detId');
+                    const detCourse = document.getElementById('detCourse');
+                    const detDept = document.getElementById('detDept');
+
+                    if (detName) detName.textContent = data.name || '-';
+                    if (detId) detId.textContent = data.student_id || '-';
+                    if (detCourse) detCourse.textContent = data.course || 'N/A';
+                    if (detDept) detDept.textContent = data.department || 'N/A';
+                    if (detCard) detCard.style.display = 'block';
+
+                    status.innerHTML = `<span style="color:#10b981;font-weight:700;">✅ Recognized: ${data.name} (ID: ${data.student_id}) &bull; Attendance Logged!</span>`;
+
+                    // Brief 900ms display on scanner card before transition to full success popup
+                    setTimeout(() => {
+                        stopCamera();
+                        closeModal('modalScan');
+                        showSuccessPopup(data);
+                        loadAttendanceRecords();
+                    }, 900);
                 } else {
-                    if (data.mismatch) {
-                        status.innerHTML = `<span style="color:#ef4444;font-size:0.95rem;font-weight:700;display:block;line-height:1.4;">❌ FACE MISMATCH! The detected face does not match the entered Student ID. Attendance Not Marked.</span>`;
+                    if (data.reason === 'unknown_student') {
+                        status.innerHTML = `<span style="color:#ef4444;font-size:0.95rem;font-weight:700;display:block;line-height:1.4;">❌ UNKNOWN STUDENT: This face is not registered in our system.</span>`;
+                    } else if (data.reason === 'uncertain_match') {
+                        status.innerHTML = `<span style="color:#f59e0b;font-size:0.95rem;font-weight:700;display:block;line-height:1.4;">⚠️ UNCERTAIN MATCH: Face confidence too low. Please reposition and look directly at camera.</span>`;
                     } else {
-                        status.innerHTML = `<span style="color:#ef4444;font-size:0.9rem;font-weight:700;display:block;line-height:1.4;">${data.message}</span>`;
+                        status.innerHTML = `<span style="color:#ef4444;font-size:0.9rem;font-weight:700;display:block;line-height:1.4;">${data.message || 'Face recognition failed.'}</span>`;
                     }
                     // Non-blocking retry after 2.5s so student can read message and try again
                     setTimeout(() => {

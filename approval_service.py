@@ -159,7 +159,7 @@ def get_request_by_id(request_id, db_config=None):
             conn.close()
 
 
-def process_approval_action(request_id, action, db_config=None):
+def process_approval_action(request_id, action, db_config=None, reason=None):
     """
     Executes the approval or rejection of a student request atomically in MySQL.
     """
@@ -298,6 +298,7 @@ def process_approval_action(request_id, action, db_config=None):
                 threading.Thread(
                     target=send_student_decision_email,
                     args=(student_email, student_name, student_id, "reject", request_id),
+                    kwargs={"reason": reason},
                     daemon=True
                 ).start()
 
@@ -455,8 +456,8 @@ def send_approval_email(
     approve_token = generate_action_token(request_id, "approve")
     reject_token = generate_action_token(request_id, "reject")
 
-    approve_url = f"{resolved_base_url}/action/{approve_token}?auto=1"
-    reject_url = f"{resolved_base_url}/action/{reject_token}?auto=1"
+    approve_url = f"{resolved_base_url}/action/{approve_token}"
+    reject_url = f"{resolved_base_url}/action/{reject_token}"
     review_url = f"{resolved_base_url}/action/{approve_token}"
 
     msg = EmailMessage()
@@ -669,7 +670,7 @@ def send_approval_email(
         return False, err_msg
 
 
-def send_student_decision_email(student_email, student_name, student_id, action, request_id=None, smtp_email=None, smtp_app_password=None):
+def send_student_decision_email(student_email, student_name, student_id, action, request_id=None, smtp_email=None, smtp_app_password=None, reason=None):
     """
     Sends an automated notification email directly to the student when their registration is Approved or Rejected.
     """
@@ -686,11 +687,12 @@ def send_student_decision_email(student_email, student_name, student_id, action,
     status_text = "APPROVED" if is_approved else "REJECTED"
     badge_bg = "#10b981" if is_approved else "#ef4444"
     heading_text = "Your Registration Has Been Approved!" if is_approved else "Your Registration Was Not Approved"
-    message_text = (
-        "Congratulations! Your student registration has been reviewed and approved by the department administrator. Your profile is now active in the system, and your face is eligible for automated attendance."
-        if is_approved else
-        "Your student registration request has been reviewed by the department administrator and was not approved. Please contact the department office if you need further clarification."
-    )
+    
+    if is_approved:
+        message_text = "Congratulations! Your student registration has been reviewed and approved by the department administrator. Your profile is now active in the system, and your face is eligible for automated attendance."
+    else:
+        reason_str = f" Reason: {reason}" if reason else ""
+        message_text = f"Your student registration request has been reviewed by the department administrator and was not approved.{reason_str} Please contact the department office if you need further clarification."
 
     msg = EmailMessage()
     msg["Subject"] = subject

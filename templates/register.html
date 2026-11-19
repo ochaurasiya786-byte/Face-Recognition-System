@@ -247,7 +247,30 @@
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- MODAL: ALREADY REGISTERED POPUP -->
+<!-- ========================================== -->
+<div id="modalAlreadyRegistered" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,0.85);backdrop-filter:blur(6px);z-index:10001;align-items:center;justify-content:center;padding:16px;">
+    <div style="max-width:480px;width:100%;text-align:center;border:2px solid #ef4444;box-shadow:0 0 35px rgba(239,68,68,0.45);background:#071426;border-radius:12px;padding:26px 22px;color:#f8fafc;box-sizing:border-box;">
+        <div style="font-size:3.5rem;margin-bottom:10px;">⚠️</div>
+        <h3 style="color:#ef4444;font-size:1.5rem;font-weight:800;margin-bottom:10px;">Already Registered!</h3>
+        <p id="alreadyRegisteredMsg" style="color:#cbd5e1;font-size:0.95rem;line-height:1.6;margin-bottom:22px;">
+            This student is already registered in the system. Please use your existing Student ID or contact the administrator.
+        </p>
+        <button type="button" class="btn btn-primary" style="background:#ef4444;border-color:#ef4444;width:100%;font-size:1rem;font-weight:700;padding:12px;border-radius:8px;cursor:pointer;" onclick="document.getElementById('modalAlreadyRegistered').style.display='none'">
+            ✔ Understood
+        </button>
+    </div>
+</div>
+
 <script>
+    function showAlreadyRegisteredPopup(msg) {
+        const el = document.getElementById('alreadyRegisteredMsg');
+        if (el && msg) el.textContent = msg;
+        const modal = document.getElementById('modalAlreadyRegistered');
+        if (modal) modal.style.display = 'flex';
+    }
+
     async function submitRegistration(event) {
         event.preventDefault();
         const submitBtn = document.getElementById('submitBtn');
@@ -285,7 +308,11 @@
                 document.getElementById('successMsg').textContent = data.message;
                 showToast('Registration submitted! Email notification sent.');
             } else {
-                showToast(data.message || 'Submission error.', true);
+                if (data.already_registered) {
+                    showAlreadyRegisteredPopup(data.message);
+                } else {
+                    showToast(data.message || 'Submission error.', true);
+                }
             }
         } catch (err) {
             showToast('Network error: ' + err.message, true);
